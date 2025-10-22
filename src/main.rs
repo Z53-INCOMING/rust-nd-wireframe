@@ -1,6 +1,8 @@
 use macroquad::prelude::*;
 use na::{Matrix4, Vector4, Vector2};
 use nalgebra as na;
+use std;
+use std::f32::consts::TAU;
 
 #[macroquad::main("MyGame")]
 async fn main() {
@@ -18,13 +20,22 @@ async fn main() {
         3, 0,
     ];
     
-    let shape_matrix = Matrix4::new_scaling(1.0);
-    let shape_position = Vector4::new(0.0, 0.0, 0.0, 0.0);
+    let mut shape_matrix = Matrix4::new_scaling(1.0);
+    let mut shape_position = Vector4::new(0.0, 0.0, 0.0, 0.0);
     
-    let camera_matrix = Matrix4::new_scaling(1.0);
-    let camera_position = Vector4::new(0.0, 0.0, -3.0, 0.0);
+    let mut camera_matrix = Matrix4::new_scaling(1.0);
+    let mut camera_position = Vector4::new(0.0, 0.0, -3.0, 0.0);
+    
+    let rotation_matrix = Matrix4::new(
+        f32::cos(TAU/256.0), f32::sin(TAU/256.0), 0.0, 0.0,
+        f32::sin(TAU/256.0), -f32::cos(TAU/256.0), 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
 
     loop {
+        shape_matrix = shape_matrix * rotation_matrix;
+        
         clear_background(BLACK);
         
         let inv_camera_matrix = camera_matrix.try_inverse().unwrap();
@@ -45,8 +56,13 @@ async fn main() {
             screen_vertex *= screen_height();
             screen_vertex += Vector2::new(screen_width(), screen_height()) / 2.0;
             
+            // Store vertex result
             projected_vertices[index] = screen_vertex;
             index += 1;
+        }
+        
+        for i in (0..edges.len()).step_by(2) {
+            draw_line(projected_vertices[edges[i]].x, projected_vertices[edges[i]].y, projected_vertices[edges[i+1]].x, projected_vertices[edges[i+1]].y, 3.0, WHITE);
         }
 
         next_frame().await
