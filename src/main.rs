@@ -28,13 +28,13 @@ async fn main() {
     
     let rotation_matrix = Matrix4::new(
         f32::cos(TAU/256.0), f32::sin(TAU/256.0), 0.0, 0.0,
-        f32::sin(TAU/256.0), -f32::cos(TAU/256.0), 0.0, 0.0,
+        -f32::sin(TAU/256.0), f32::cos(TAU/256.0), 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
         0.0, 0.0, 0.0, 1.0
     );
 
     loop {
-        shape_matrix = shape_matrix * rotation_matrix;
+        shape_matrix = rotation_matrix * shape_matrix;
         
         clear_background(BLACK);
         
