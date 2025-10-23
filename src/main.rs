@@ -86,13 +86,15 @@ async fn main() {
     loop {
         shape_matrix = xy_matrix(TAU * get_frame_time() * 0.125) * shape_matrix;
         shape_matrix = xz_matrix(TAU * get_frame_time() * 0.6165165326523 * 0.25) * shape_matrix;
-        shape_matrix = shape_matrix * yw_matrix(TAU * get_frame_time() * 0.1440937294359 * 0.25);
+        shape_matrix = yw_matrix(TAU * get_frame_time() * 0.1440937294359 * 0.25) * shape_matrix;
         
         clear_background(BLACK);
         
         let inv_camera_matrix = camera_matrix.try_inverse().unwrap();
         
         let mut projected_vertices: [Vector2<f32>; vertices.len()] = [Vector2::default(); vertices.len()];
+        
+        let screen_size = Vector2::new(screen_width(), screen_height());
 
         let mut index = 0;
         for vertex in vertices {
@@ -106,7 +108,7 @@ async fn main() {
             // Vertex in screen space
             let mut screen_vertex = Vector2::new(transformed_vertex.x, transformed_vertex.y) / transformed_vertex.z;
             screen_vertex *= screen_height();
-            screen_vertex += Vector2::new(screen_width(), screen_height()) / 2.0;
+            screen_vertex += screen_size / 2.0;
             
             // Store vertex result
             projected_vertices[index] = screen_vertex;
@@ -114,7 +116,11 @@ async fn main() {
         }
         
         for i in (0..edges.len()).step_by(2) {
-            draw_line(projected_vertices[edges[i]].x, projected_vertices[edges[i]].y, projected_vertices[edges[i+1]].x, projected_vertices[edges[i+1]].y, 3.0, WHITE);
+            draw_line(projected_vertices[edges[i]].x, projected_vertices[edges[i]].y, projected_vertices[edges[i+1]].x, projected_vertices[edges[i+1]].y, screen_size.y / 120.0, WHITE);
+        }
+        
+        for i in (0..projected_vertices.len()) {
+            draw_circle(projected_vertices[i].x, projected_vertices[i].y, screen_size.y / 60.0, RED);
         }
 
         next_frame().await
