@@ -97,6 +97,26 @@ fn xw_matrix(radians: f32) -> Matrix4<f32> {
     return matrix;
 }
 
+fn draw_variable_width_line(start_point: Vector2<f32>, end_point: Vector2<f32>, start_radius: f32, end_radius: f32, color: Color) {
+    let edge_direction = (end_point - start_point).normalize();
+    let left_of_edge = Vector2::new(edge_direction.y, -edge_direction.x);
+    let right_of_edge = Vector2::new(-edge_direction.y, edge_direction.x);
+    
+    draw_triangle(
+        vec2(start_point.x + (left_of_edge.x * start_radius), start_point.y + (left_of_edge.y * start_radius)),
+        vec2(start_point.x + (right_of_edge.x * start_radius), start_point.y + (right_of_edge.y * start_radius)),
+        vec2(end_point.x + (left_of_edge.x * end_radius), end_point.y + (left_of_edge.y * end_radius)),
+        color
+    );
+    
+    draw_triangle(
+        vec2(end_point.x + (left_of_edge.x * end_radius), end_point.y + (left_of_edge.y * end_radius)),
+        vec2(end_point.x + (right_of_edge.x * end_radius), end_point.y + (right_of_edge.y * end_radius)),
+        vec2(start_point.x + (right_of_edge.x * start_radius), start_point.y + (right_of_edge.y * start_radius)),
+        color
+    );
+}
+
 #[macroquad::main("4D Renderer")]
 async fn main() {
     let mut shape_matrix = Matrix4::new_scaling(1.0);
@@ -177,26 +197,10 @@ async fn main() {
             let vertex_a = Vector2::new(projected_vertices[edges[i]].x, projected_vertices[edges[i]].y);
             let vertex_b = Vector2::new(projected_vertices[edges[i + 1]].x, projected_vertices[edges[i + 1]].y);
             
-            let edge_direction = (vertex_b - vertex_a).normalize();
-            let left_of_edge = Vector2::new(edge_direction.y, -edge_direction.x);
-            let right_of_edge = Vector2::new(-edge_direction.y, edge_direction.x);
+            let radius_a = ((screen_size.y * edge_width) / depth_of_vertices[edges[i]]);
+            let radius_b = ((screen_size.y * edge_width) / depth_of_vertices[edges[i + 1]]);
             
-            let a_radius = ((screen_size.y * edge_width) / depth_of_vertices[edges[i]]);
-            let b_radius = ((screen_size.y * edge_width) / depth_of_vertices[edges[i + 1]]);
-            
-            draw_triangle(
-                vec2(vertex_a.x + (left_of_edge.x * a_radius), vertex_a.y + (left_of_edge.y * a_radius)),
-                vec2(vertex_a.x + (right_of_edge.x * a_radius), vertex_a.y + (right_of_edge.y * a_radius)),
-                vec2(vertex_b.x + (left_of_edge.x * b_radius), vertex_b.y + (left_of_edge.y * b_radius)),
-                WHITE
-            );
-            
-            draw_triangle(
-                vec2(vertex_b.x + (left_of_edge.x * b_radius), vertex_b.y + (left_of_edge.y * b_radius)),
-                vec2(vertex_b.x + (right_of_edge.x * b_radius), vertex_b.y + (right_of_edge.y * b_radius)),
-                vec2(vertex_a.x + (right_of_edge.x * a_radius), vertex_a.y + (right_of_edge.y * a_radius)),
-                WHITE
-            );
+            draw_variable_width_line(vertex_a, vertex_b, radius_a, radius_b, WHITE);
         }
         
         for i in (0..projected_vertices.len()) {
