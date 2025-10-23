@@ -67,12 +67,34 @@ fn xz_matrix(radians: f32) -> Matrix4<f32> {
     return matrix;
 }
 
+fn yz_matrix(radians: f32) -> Matrix4<f32> {
+    let matrix = Matrix4::new(
+        1.0, 0.0, 0.0, 0.0,
+        0.0, f32::cos(radians), f32::sin(radians), 0.0,
+        0.0, -f32::sin(radians), f32::cos(radians), 0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
+    
+    return matrix;
+}
+
 fn yw_matrix(radians: f32) -> Matrix4<f32> {
     let matrix = Matrix4::new(
         1.0, 0.0, 0.0, 0.0,
         0.0, f32::cos(radians), 0.0, f32::sin(radians),
         0.0, 0.0, 1.0, 0.0,
         0.0, -f32::sin(radians), 0.0, f32::cos(radians),
+    );
+    
+    return matrix;
+}
+
+fn xw_matrix(radians: f32) -> Matrix4<f32> {
+    let matrix = Matrix4::new(
+        f32::cos(radians), 0.0, 0.0, f32::sin(radians),
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        -f32::sin(radians), 0.0, 0.0, f32::cos(radians),
     );
     
     return matrix;
@@ -85,11 +107,26 @@ async fn main() {
     
     let mut camera_matrix = Matrix4::new_scaling(1.0);
     let mut camera_position = Vector4::new(0.0, 0.0, -2.0, 0.0);
+    
+    let mut previous_mouse_pos = Vector2::new(0.0, 0.0);
 
     loop {
-        shape_matrix = xy_matrix(TAU * get_frame_time() * 0.125) * shape_matrix;
-        shape_matrix = xz_matrix(TAU * get_frame_time() * 0.6165165326523 * 0.25) * shape_matrix;
-        shape_matrix = yw_matrix(TAU * get_frame_time() * 0.1440937294359 * 0.25) * shape_matrix;
+        // Rotate Shape
+        if is_mouse_button_pressed(MouseButton::Left) || is_mouse_button_pressed(MouseButton::Middle) {
+            (previous_mouse_pos.x, previous_mouse_pos.y) = mouse_position();
+        }
+        
+        if is_mouse_button_down(MouseButton::Left) || is_mouse_button_down(MouseButton::Middle) {
+            if is_key_down(KeyCode::LeftControl) {
+                shape_matrix = xw_matrix((previous_mouse_pos.x - mouse_position().0) / -216.0) * shape_matrix;
+                shape_matrix = yw_matrix((previous_mouse_pos.y - mouse_position().1) / -216.0) * shape_matrix;
+            } else {
+                shape_matrix = xz_matrix((previous_mouse_pos.x - mouse_position().0) / -216.0) * shape_matrix;
+                shape_matrix = yz_matrix((previous_mouse_pos.y - mouse_position().1) / -216.0) * shape_matrix;
+            }
+            
+            (previous_mouse_pos.x, previous_mouse_pos.y) = mouse_position();
+        }
         
         clear_background(BLACK);
         
