@@ -4,9 +4,6 @@ use nalgebra as na;
 use std;
 use std::f32::consts::TAU;
 
-const render_size: f32 = 0.5;
-const edge_width: f32 = 1.0 / 84.0;
-
 const vertices: [Vector4<f32>; 8] = [
     Vector4::new(1.0, 0.0, 0.0, 0.0),
     Vector4::new(-1.0, 0.0, 0.0, 0.0),
@@ -108,6 +105,9 @@ async fn main() {
     let mut camera_matrix = Matrix4::new_scaling(1.0);
     let mut camera_position = Vector4::new(0.0, 0.0, -2.0, 0.0);
     
+    let mut render_size= 0.5;
+    let mut edge_width= 1.0 / 84.0;
+    
     let mut previous_mouse_pos = Vector2::new(0.0, 0.0);
 
     loop {
@@ -127,6 +127,22 @@ async fn main() {
             
             (previous_mouse_pos.x, previous_mouse_pos.y) = mouse_position();
         }
+        
+        let scroll = mouse_wheel().1;
+        if scroll < 0.0 {
+            if is_key_down(KeyCode::LeftControl) {
+                render_size *= 12.0/13.0;
+            } else {
+                camera_position.z *= 13.0/12.0;
+            }
+        } else if scroll > 0.0 {
+            if is_key_down(KeyCode::LeftControl) {
+                render_size *= 13.0/12.0;
+            } else {
+                camera_position.z *= 12.0/13.0;
+            }
+        }
+        
         
         clear_background(BLACK);
         
