@@ -1,192 +1,8 @@
 use macroquad::prelude::*;
 use na::{Matrix4, Vector4, Vector2};
-use nalgebra as na;
+use nalgebra::{self as na, Cholesky};
 use std;
 use std::f32::consts::TAU;
-
-const vertices: [Vector4<f32>; 24] = [
-    Vector4::new(-1.0, -1.0, -1.0, -1.0),
-    Vector4::new(1.0, -1.0, -1.0, -1.0),
-    Vector4::new(-1.0, 1.0, -1.0, -1.0),
-    Vector4::new(1.0, 1.0, -1.0, -1.0),
-    Vector4::new(-1.0, -1.0, 1.0, -1.0),
-    Vector4::new(1.0, -1.0, 1.0, -1.0),
-    Vector4::new(-1.0, 1.0, 1.0, -1.0),
-    Vector4::new(1.0, 1.0, 1.0, -1.0),
-    Vector4::new(-1.0, -1.0, -1.0, 1.0),
-    Vector4::new(1.0, -1.0, -1.0, 1.0),
-    Vector4::new(-1.0, 1.0, -1.0, 1.0),
-    Vector4::new(1.0, 1.0, -1.0, 1.0),
-    Vector4::new(-1.0, -1.0, 1.0, 1.0),
-    Vector4::new(1.0, -1.0, 1.0, 1.0),
-    Vector4::new(-1.0, 1.0, 1.0, 1.0),
-    Vector4::new(1.0, 1.0, 1.0, 1.0),
-    //
-    Vector4::new(-2.0, 0.0, 0.0, 0.0),
-    Vector4::new(2.0, 0.0, 0.0, 0.0),
-    Vector4::new(0.0, -2.0, 0.0, 0.0),
-    Vector4::new(0.0, 2.0, 0.0, 0.0),
-    Vector4::new(0.0, 0.0, -2.0, 0.0),
-    Vector4::new(0.0, 0.0, 2.0, 0.0),
-    Vector4::new(0.0, 0.0, 0.0, -2.0),
-    Vector4::new(0.0, 0.0, 0.0, 2.0),
-];
-
-const edges: [usize; 192] = [
-    0b0000, 0b0001,
-    0b0000, 0b0010,
-    0b0001, 0b0011,
-    0b0010, 0b0011,
-    0b0100, 0b0101,
-    0b0100, 0b0110,
-    0b0101, 0b0111,
-    0b0110, 0b0111,
-    0b0000, 0b0100,
-    0b0001, 0b0101,
-    0b0010, 0b0110,
-    0b0011, 0b0111,
-    0b1000, 0b1001,
-    0b1000, 0b1010,
-    0b1001, 0b1011,
-    0b1010, 0b1011,
-    0b1100, 0b1101,
-    0b1100, 0b1110,
-    0b1101, 0b1111,
-    0b1110, 0b1111,
-    0b1000, 0b1100,
-    0b1001, 0b1101,
-    0b1010, 0b1110,
-    0b1011, 0b1111,
-    0b0000, 0b1000,
-    0b0001, 0b1001,
-    0b0010, 0b1010,
-    0b0011, 0b1011,
-    0b0100, 0b1100,
-    0b0101, 0b1101,
-    0b0110, 0b1110,
-    0b0111, 0b1111,
-    //
-    0b10000, 0b0000,
-    0b10000, 0b0010,
-    0b10000, 0b0100,
-    0b10000, 0b0110,
-    0b10000, 0b1000,
-    0b10000, 0b1010,
-    0b10000, 0b1100,
-    0b10000, 0b1110,
-    0b10001, 0b0001,
-    0b10001, 0b0011,
-    0b10001, 0b0101,
-    0b10001, 0b0111,
-    0b10001, 0b1001,
-    0b10001, 0b1011,
-    0b10001, 0b1101,
-    0b10001, 0b1111,
-    0b10010, 0b0000,
-    0b10010, 0b0001,
-    0b10010, 0b0100,
-    0b10010, 0b0101,
-    0b10010, 0b1000,
-    0b10010, 0b1001,
-    0b10010, 0b1100,
-    0b10010, 0b1101,
-    0b10011, 0b0010,
-    0b10011, 0b0011,
-    0b10011, 0b0110,
-    0b10011, 0b0111,
-    0b10011, 0b1010,
-    0b10011, 0b1011,
-    0b10011, 0b1110,
-    0b10011, 0b1111,
-    0b10100, 0b0000,
-    0b10100, 0b0001,
-    0b10100, 0b0010,
-    0b10100, 0b0011,
-    0b10100, 0b1000,
-    0b10100, 0b1001,
-    0b10100, 0b1010,
-    0b10100, 0b1011,
-    0b10101, 0b0100,
-    0b10101, 0b0101,
-    0b10101, 0b0110,
-    0b10101, 0b0111,
-    0b10101, 0b1100,
-    0b10101, 0b1101,
-    0b10101, 0b1110,
-    0b10101, 0b1111,
-    0b10110, 0b0000,
-    0b10110, 0b0001,
-    0b10110, 0b0010,
-    0b10110, 0b0011,
-    0b10110, 0b0100,
-    0b10110, 0b0101,
-    0b10110, 0b0110,
-    0b10110, 0b0111,
-    0b10111, 0b1000,
-    0b10111, 0b1001,
-    0b10111, 0b1010,
-    0b10111, 0b1011,
-    0b10111, 0b1100,
-    0b10111, 0b1101,
-    0b10111, 0b1110,
-    0b10111, 0b1111
-];
-
-// Tesseract
-
-// const vertices: [Vector4<f32>; 16] = [
-//     Vector4::new(-1.0, -1.0, -1.0, -1.0),
-//     Vector4::new(1.0, -1.0, -1.0, -1.0),
-//     Vector4::new(-1.0, 1.0, -1.0, -1.0),
-//     Vector4::new(1.0, 1.0, -1.0, -1.0),
-//     Vector4::new(-1.0, -1.0, 1.0, -1.0),
-//     Vector4::new(1.0, -1.0, 1.0, -1.0),
-//     Vector4::new(-1.0, 1.0, 1.0, -1.0),
-//     Vector4::new(1.0, 1.0, 1.0, -1.0),
-//     Vector4::new(-1.0, -1.0, -1.0, 1.0),
-//     Vector4::new(1.0, -1.0, -1.0, 1.0),
-//     Vector4::new(-1.0, 1.0, -1.0, 1.0),
-//     Vector4::new(1.0, 1.0, -1.0, 1.0),
-//     Vector4::new(-1.0, -1.0, 1.0, 1.0),
-//     Vector4::new(1.0, -1.0, 1.0, 1.0),
-//     Vector4::new(-1.0, 1.0, 1.0, 1.0),
-//     Vector4::new(1.0, 1.0, 1.0, 1.0)
-// ];
-
-// const edges: [usize; 64] = [
-//     0b0000, 0b0001,
-//     0b0000, 0b0010,
-//     0b0001, 0b0011,
-//     0b0010, 0b0011,
-//     0b0100, 0b0101,
-//     0b0100, 0b0110,
-//     0b0101, 0b0111,
-//     0b0110, 0b0111,
-//     0b0000, 0b0100,
-//     0b0001, 0b0101,
-//     0b0010, 0b0110,
-//     0b0011, 0b0111,
-//     0b1000, 0b1001,
-//     0b1000, 0b1010,
-//     0b1001, 0b1011,
-//     0b1010, 0b1011,
-//     0b1100, 0b1101,
-//     0b1100, 0b1110,
-//     0b1101, 0b1111,
-//     0b1110, 0b1111,
-//     0b1000, 0b1100,
-//     0b1001, 0b1101,
-//     0b1010, 0b1110,
-//     0b1011, 0b1111,
-//     0b0000, 0b1000,
-//     0b0001, 0b1001,
-//     0b0010, 0b1010,
-//     0b0011, 0b1011,
-//     0b0100, 0b1100,
-//     0b0101, 0b1101,
-//     0b0110, 0b1110,
-//     0b0111, 0b1111,
-// ];
 
 fn xy_matrix(radians: f32) -> Matrix4<f32> {
     let matrix = Matrix4::new(
@@ -243,6 +59,33 @@ fn xw_matrix(radians: f32) -> Matrix4<f32> {
     return matrix;
 }
 
+fn generate_polytope_from_coxeter_diagram(vertices: &Vec<Vector4<f32>>, edges: &Vec<usize>, coxeter_edges: &Vec<u8>, coxeter_rings: u8) {
+    let mut angles: Vec<f32> = Vec::new();
+    
+    for weight in coxeter_edges {
+        // every angle is an nth of a half turn
+        angles.push(TAU / ((*weight * 2) as f32));
+    }
+    
+    let mut pre_matrix: Matrix4<f32> = Matrix4::identity();
+    
+    let rank = coxeter_edges.len() + 1;
+    
+    for i in 0..rank {
+        for j in 0..rank {
+            if i != j { // preserve diagonal
+                if i8::abs((i as i8) - (j as i8)) == 1 { // if the nodes are right next to each other, there's an edge connecting them
+                    pre_matrix[i * 4 + j] = f32::cos(angles[usize::min(i, j)]);
+                } // otherwise, the weight is 2, and cosine of 90 degrees is 0, and it's already 0
+            }
+        }
+    }
+    
+    let mirror_matrix: Matrix4<f32> = pre_matrix.cholesky().expect("invalid coxeter diagram").unpack().transpose();
+    
+    println!("{}", mirror_matrix);
+}
+
 fn draw_variable_width_line(start_point: Vector2<f32>, end_point: Vector2<f32>, start_radius: f32, end_radius: f32, color: Color) {
     let edge_direction = (end_point - start_point).normalize();
     let left_of_edge = Vector2::new(edge_direction.y, -edge_direction.x);
@@ -265,6 +108,11 @@ fn draw_variable_width_line(start_point: Vector2<f32>, end_point: Vector2<f32>, 
 
 #[macroquad::main("4D Renderer")]
 async fn main() {
+    let mut vertices: Vec<Vector4<f32>> = Vec::new();
+    let mut edges: Vec<usize> = Vec::new();
+    
+    generate_polytope_from_coxeter_diagram(&vertices, &edges, &vec![4, 3], 0b1000);
+    
     let mut shape_matrix = Matrix4::new_scaling(1.0);
     let mut shape_position = Vector4::new(0.0, 0.0, 0.0, 0.0);
     
@@ -314,13 +162,13 @@ async fn main() {
         
         let inv_camera_matrix = camera_matrix.try_inverse().unwrap();
         
-        let mut projected_vertices: [Vector2<f32>; vertices.len()] = [Vector2::default(); vertices.len()];
-        let mut depth_of_vertices: [f32; vertices.len()] = [0.0; vertices.len()];
+        let mut projected_vertices: Vec<Vector2<f32>> = Vec::new();
+        let mut depth_of_vertices: Vec<f32> = Vec::new();
         
         let screen_size = Vector2::new(screen_width(), screen_height());
 
         let mut index = 0;
-        for vertex in vertices {
+        for vertex in &vertices {
             // Vertex in world space
             let mut transformed_vertex = (shape_matrix * vertex) + shape_position;
             
@@ -334,8 +182,8 @@ async fn main() {
             screen_vertex += screen_size / 2.0;
             
             // Store vertex result
-            projected_vertices[index] = screen_vertex;
-            depth_of_vertices[index] = transformed_vertex.z;
+            projected_vertices.push(screen_vertex);
+            depth_of_vertices.push(transformed_vertex.z);
             index += 1;
         }
         
