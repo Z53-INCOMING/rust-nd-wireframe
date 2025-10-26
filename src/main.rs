@@ -1,6 +1,7 @@
 use macroquad::prelude::*;
+use macroquad::rand::rand;
 use na::{Matrix4, Vector4, Vector2};
-use nalgebra::{self as na, Cholesky};
+use nalgebra::{self as na, Cholesky, Reflection4};
 use std;
 use std::f32::consts::TAU;
 
@@ -59,7 +60,7 @@ fn xw_matrix(radians: f32) -> Matrix4<f32> {
     return matrix;
 }
 
-fn generate_polytope_from_coxeter_diagram(vertices: &Vec<Vector4<f32>>, edges: &Vec<usize>, coxeter_edges: &Vec<u8>, coxeter_rings: u8) {
+fn generate_polytope_from_coxeter_diagram(vertices: &mut Vec<Vector4<f32>>, edges: &mut Vec<usize>, coxeter_edges: &Vec<u8>, coxeter_rings: &Vec<bool>) {
     let mut angles: Vec<f32> = Vec::new();
     
     for weight in coxeter_edges {
@@ -83,7 +84,31 @@ fn generate_polytope_from_coxeter_diagram(vertices: &Vec<Vector4<f32>>, edges: &
     
     let mirror_matrix: Matrix4<f32> = pre_matrix.cholesky().expect("invalid coxeter diagram").unpack().transpose();
     
-    println!("{}", mirror_matrix);
+    let mut point: Vector4<f32> = Vector4::new(0.0, 0.0, 0.0, 0.0);
+    
+    // thanks buzz for the wedge product
+    let fundamental_simplex = Matrix4::from_fn(|r, c| {
+            (-1f32).powi(r as i32) * mirror_matrix.remove_row(r).remove_column(c).determinant()
+        }
+    );
+    
+    let mut ringed_node_count = 0;
+    for i in 0..rank {
+        if coxeter_rings[i] {
+            point += fundamental_simplex.column(i);
+            ringed_node_count += 1;
+        }
+    }
+    point /= ringed_node_count as f32;
+    point = point.normalize();
+    
+    for i in 0..256 {
+        vertices.push(point);
+        
+        let mirror_index= (rand() % rank as u32) as usize;
+        
+        point += -point.dot(&mirror_matrix.column(mirror_index)) * mirror_matrix.column(mirror_index) * 2.0;
+    }
 }
 
 fn draw_variable_width_line(start_point: Vector2<f32>, end_point: Vector2<f32>, start_radius: f32, end_radius: f32, color: Color) {
@@ -111,7 +136,7 @@ async fn main() {
     let mut vertices: Vec<Vector4<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    generate_polytope_from_coxeter_diagram(&vertices, &edges, &vec![4, 3], 0b1000);
+    generate_polytope_from_coxeter_diagram(&mut vertices, &mut edges, &vec![3, 3, 3], &vec![true, true, true, false]);
     
     let mut shape_matrix = Matrix4::new_scaling(1.0);
     let mut shape_position = Vector4::new(0.0, 0.0, 0.0, 0.0);
