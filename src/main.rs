@@ -43,30 +43,39 @@ fn draw_variable_width_line(start_point: Vector2<f32>, end_point: Vector2<f32>, 
     );
 }
 
+fn mouse_control(previous_mouse_pos: Vector2<f32>, dimension: usize, shape_matrix: DMatrix<f32>, axis: usize) -> DMatrix<f32> {
+    if axis < dimension {
+        return rotate_matrix(1, axis, (previous_mouse_pos.y - mouse_position().1) / 216.0, dimension) * rotate_matrix(0, axis, (previous_mouse_pos.x - mouse_position().0) / 216.0, dimension) * shape_matrix;
+    } else {
+        return shape_matrix;
+    }
+}
+
 #[macroquad::main("nD Renderer")]
 async fn main() {
-    let mut dimension = 4;
+    let mut dimension = 5;
     
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
     vertices = [
-        DVector::from_column_slice(&[-1.0, -1.0, -1.0, -1.0]),
-        DVector::from_column_slice(&[1.0, -1.0, -1.0, -1.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, -1.0, -1.0]),
-        DVector::from_column_slice(&[1.0, 1.0, -1.0, -1.0]),
-        DVector::from_column_slice(&[-1.0, -1.0, 1.0, -1.0]),
-        DVector::from_column_slice(&[1.0, -1.0, 1.0, -1.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, 1.0, -1.0]),
-        DVector::from_column_slice(&[1.0, 1.0, 1.0, -1.0]),
-        DVector::from_column_slice(&[-1.0, -1.0, -1.0, 1.0]),
-        DVector::from_column_slice(&[1.0, -1.0, -1.0, 1.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, -1.0, 1.0]),
-        DVector::from_column_slice(&[1.0, 1.0, -1.0, 1.0]),
-        DVector::from_column_slice(&[-1.0, -1.0, 1.0, 1.0]),
-        DVector::from_column_slice(&[1.0, -1.0, 1.0, 1.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, 1.0, 1.0]),
-        DVector::from_column_slice(&[1.0, 1.0, 1.0, 1.0])
+        DVector::from_column_slice(&[-1.0, -1.0, -1.0, -1.0, 0.0]),
+        DVector::from_column_slice(&[1.0, -1.0, -1.0, -1.0, 0.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, -1.0, -1.0, 0.0]),
+        DVector::from_column_slice(&[1.0, 1.0, -1.0, -1.0, 0.0]),
+        DVector::from_column_slice(&[-1.0, -1.0, 1.0, -1.0, 0.0]),
+        DVector::from_column_slice(&[1.0, -1.0, 1.0, -1.0, 0.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, 1.0, -1.0, 0.0]),
+        DVector::from_column_slice(&[1.0, 1.0, 1.0, -1.0, 0.0]),
+        DVector::from_column_slice(&[-1.0, -1.0, -1.0, 1.0, 0.0]),
+        DVector::from_column_slice(&[1.0, -1.0, -1.0, 1.0, 0.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, -1.0, 1.0, 0.0]),
+        DVector::from_column_slice(&[1.0, 1.0, -1.0, 1.0, 0.0]),
+        DVector::from_column_slice(&[-1.0, -1.0, 1.0, 1.0, 0.0]),
+        DVector::from_column_slice(&[1.0, -1.0, 1.0, 1.0, 0.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, 1.0, 1.0, 0.0]),
+        DVector::from_column_slice(&[1.0, 1.0, 1.0, 1.0, 0.0]),
+        DVector::from_column_slice(&[-1.0, -1.0, -1.0, -1.0, 1.0])
     ].to_vec();
 
     edges = [
@@ -102,6 +111,7 @@ async fn main() {
         0b0101, 0b1101,
         0b0110, 0b1110,
         0b0111, 0b1111,
+        0b0000, 0b10000
     ].to_vec();
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
@@ -123,12 +133,18 @@ async fn main() {
         }
         
         if is_mouse_button_down(MouseButton::Left) || is_mouse_button_down(MouseButton::Middle) {
-            if is_key_down(KeyCode::LeftControl) {
-                shape_matrix = rotate_matrix(0, 3, (previous_mouse_pos.x - mouse_position().0) / 216.0, dimension) * shape_matrix;
-                shape_matrix = rotate_matrix(1, 3, (previous_mouse_pos.y - mouse_position().1) / 216.0, dimension) * shape_matrix;
+            if is_key_down(KeyCode::Z) {
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 4);
+            } else if is_key_down(KeyCode::X) {
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 5);
+            } else if is_key_down(KeyCode::C) {
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 6);
+            } else if is_key_down(KeyCode::V) {
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 7);
+            } else if is_key_down(KeyCode::LeftControl) {
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 3);
             } else {
-                shape_matrix = rotate_matrix(0, 2, (previous_mouse_pos.x - mouse_position().0) / 216.0, dimension) * shape_matrix;
-                shape_matrix = rotate_matrix(1, 2, (previous_mouse_pos.y - mouse_position().1) / 216.0, dimension) * shape_matrix;
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 2);
             }
             
             (previous_mouse_pos.x, previous_mouse_pos.y) = mouse_position();
