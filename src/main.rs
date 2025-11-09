@@ -102,7 +102,7 @@ fn generate_polytope_from_coxeter_diagram(vertices: &mut Vec<Vector4<f32>>, edge
     point /= ringed_node_count as f32;
     point = point.normalize();
     
-    for i in 0..256 {
+    for i in 0..2048 {
         vertices.push(point);
         
         let mirror_index= (rand() % rank as u32) as usize;
@@ -136,7 +136,59 @@ async fn main() {
     let mut vertices: Vec<Vector4<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    generate_polytope_from_coxeter_diagram(&mut vertices, &mut edges, &vec![3, 3, 3], &vec![true, true, true, false]);
+    vertices = [
+        Vector4::new(-1.0, -1.0, -1.0, -1.0),
+        Vector4::new(1.0, -1.0, -1.0, -1.0),
+        Vector4::new(-1.0, 1.0, -1.0, -1.0),
+        Vector4::new(1.0, 1.0, -1.0, -1.0),
+        Vector4::new(-1.0, -1.0, 1.0, -1.0),
+        Vector4::new(1.0, -1.0, 1.0, -1.0),
+        Vector4::new(-1.0, 1.0, 1.0, -1.0),
+        Vector4::new(1.0, 1.0, 1.0, -1.0),
+        Vector4::new(-1.0, -1.0, -1.0, 1.0),
+        Vector4::new(1.0, -1.0, -1.0, 1.0),
+        Vector4::new(-1.0, 1.0, -1.0, 1.0),
+        Vector4::new(1.0, 1.0, -1.0, 1.0),
+        Vector4::new(-1.0, -1.0, 1.0, 1.0),
+        Vector4::new(1.0, -1.0, 1.0, 1.0),
+        Vector4::new(-1.0, 1.0, 1.0, 1.0),
+        Vector4::new(1.0, 1.0, 1.0, 1.0)
+    ].to_vec();
+
+    edges = [
+        0b0000, 0b0001,
+        0b0000, 0b0010,
+        0b0001, 0b0011,
+        0b0010, 0b0011,
+        0b0100, 0b0101,
+        0b0100, 0b0110,
+        0b0101, 0b0111,
+        0b0110, 0b0111,
+        0b0000, 0b0100,
+        0b0001, 0b0101,
+        0b0010, 0b0110,
+        0b0011, 0b0111,
+        0b1000, 0b1001,
+        0b1000, 0b1010,
+        0b1001, 0b1011,
+        0b1010, 0b1011,
+        0b1100, 0b1101,
+        0b1100, 0b1110,
+        0b1101, 0b1111,
+        0b1110, 0b1111,
+        0b1000, 0b1100,
+        0b1001, 0b1101,
+        0b1010, 0b1110,
+        0b1011, 0b1111,
+        0b0000, 0b1000,
+        0b0001, 0b1001,
+        0b0010, 0b1010,
+        0b0011, 0b1011,
+        0b0100, 0b1100,
+        0b0101, 0b1101,
+        0b0110, 0b1110,
+        0b0111, 0b1111,
+    ].to_vec();
     
     let mut shape_matrix = Matrix4::new_scaling(1.0);
     let mut shape_position = Vector4::new(0.0, 0.0, 0.0, 0.0);
@@ -181,6 +233,7 @@ async fn main() {
                 camera_position.z *= 12.0/13.0;
             }
         }
+        camera_position.w = camera_position.z;
         
         
         clear_background(BLACK);
@@ -202,7 +255,7 @@ async fn main() {
             transformed_vertex = inv_camera_matrix * transformed_vertex;
             
             // Vertex in screen space
-            let mut screen_vertex = Vector2::new(transformed_vertex.x, transformed_vertex.y) / transformed_vertex.z;
+            let mut screen_vertex = Vector2::new(transformed_vertex.x, transformed_vertex.y) / (transformed_vertex.z);
             screen_vertex *= -screen_height() * render_size;
             screen_vertex += screen_size / 2.0;
             
