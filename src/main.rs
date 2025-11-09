@@ -70,6 +70,10 @@ fn color_from_w(w: f32, w_scale: f32) -> Color {
     }
 }
 
+fn fade_from_depth(z: f32, near: f32, far: f32, zoom: f32) -> f32 {
+    1.0 - clamp(f32::inverse_lerp(near + zoom, far + zoom, z), 0.0, 1.0)
+}
+
 #[macroquad::main("nD Renderer")]
 async fn main() {
     let mut dimension = 5;
@@ -139,7 +143,11 @@ async fn main() {
     
     let mut render_size= 0.5;
     let mut edge_width= 1.0 / 84.0;
-    let mut zoom = 1.0;
+    let mut zoom = 2.0;
+    
+    let mut w_scale: f32 = 0.5;
+    let mut near = -1.0;
+    let mut far = 0.5;
     
     let mut previous_mouse_pos = Vector2::new(0.0, 0.0);
     
@@ -174,15 +182,16 @@ async fn main() {
             if is_key_down(KeyCode::LeftControl) {
                 render_size *= 12.0/13.0;
             } else {
-                shape_position[2] *= 13.0/12.0;
+                zoom *= 13.0/12.0;
             }
         } else if scroll > 0.0 {
             if is_key_down(KeyCode::LeftControl) {
                 render_size *= 13.0/12.0;
             } else {
-                shape_position[2] *= 12.0/13.0;
+                zoom *= 12.0/13.0;
             }
         }
+        shape_position[2] = zoom;
         
         
         clear_background(BLACK);
@@ -213,7 +222,10 @@ async fn main() {
                 
                 let edge_center = vertex_a.lerp(&vertex_b, (s as f32) / ((subdivisions - 1) as f32));
                 
-                draw_variable_width_line(project_vertex(&vertex_1, render_size, screen_size), project_vertex(&vertex_2, render_size, screen_size), radius_1, radius_2, color_from_w(edge_center[3], 0.5));
+                let mut color = color_from_w(edge_center[3], w_scale);
+                color.a *= fade_from_depth(edge_center[2], near, far, zoom);
+                
+                draw_variable_width_line(project_vertex(&vertex_1, render_size, screen_size), project_vertex(&vertex_2, render_size, screen_size), radius_1, radius_2, color);
             }
             
         }
@@ -221,7 +233,10 @@ async fn main() {
         for i in (0..local_space_vertices.len()) {
             let coord = project_vertex(&local_space_vertices[i], render_size, screen_size);
             
-            draw_circle(coord.x, coord.y, ((screen_size.y * edge_width) / local_space_vertices[i][2]), color_from_w(local_space_vertices[i][3], 0.5));
+            let mut color = color_from_w(local_space_vertices[i][3], w_scale);
+            color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
+            
+            draw_circle(coord.x, coord.y, ((screen_size.y * edge_width) / local_space_vertices[i][2]), color);
         }
 
         next_frame().await
