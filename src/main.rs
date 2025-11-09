@@ -1,115 +1,27 @@
 use macroquad::prelude::*;
-use macroquad::rand::rand;
-use na::{Matrix4, Vector4, Vector2};
-use nalgebra::{self as na, Cholesky, Reflection4};
+use na::Vector2;
+use nalgebra::{self as na, DMatrix, DVector};
 use std;
 use std::f32::consts::TAU;
+use std::fs::File;
 
-fn xy_matrix(radians: f32) -> Matrix4<f32> {
-    let matrix = Matrix4::new(
-        f32::cos(radians), f32::sin(radians), 0.0, 0.0,
-        -f32::sin(radians), f32::cos(radians), 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
-        0.0, 0.0, 0.0, 1.0
-    );
+fn rotate_matrix(axis_1: usize, axis_2: usize, angle_in_radians: f32, dimension: usize) -> DMatrix<f32> {
+    let mut matrix = DMatrix::identity(dimension, dimension);
+    
+    matrix[axis_1 + (axis_1 * dimension)] = f32::cos(angle_in_radians);
+    matrix[axis_2 + (axis_1 * dimension)] = f32::sin(angle_in_radians);
+    
+    matrix[axis_1 + (axis_2 * dimension)] = -f32::sin(angle_in_radians);
+    matrix[axis_2 + (axis_2 * dimension)] = f32::cos(angle_in_radians);
     
     return matrix;
 }
 
-fn xz_matrix(radians: f32) -> Matrix4<f32> {
-    let matrix = Matrix4::new(
-        f32::cos(radians), 0.0, f32::sin(radians), 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        -f32::sin(radians), 0.0, f32::cos(radians), 0.0,
-        0.0, 0.0, 0.0, 1.0
-    );
+fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>) {
     
-    return matrix;
 }
 
-fn yz_matrix(radians: f32) -> Matrix4<f32> {
-    let matrix = Matrix4::new(
-        1.0, 0.0, 0.0, 0.0,
-        0.0, f32::cos(radians), f32::sin(radians), 0.0,
-        0.0, -f32::sin(radians), f32::cos(radians), 0.0,
-        0.0, 0.0, 0.0, 1.0
-    );
-    
-    return matrix;
-}
 
-fn yw_matrix(radians: f32) -> Matrix4<f32> {
-    let matrix = Matrix4::new(
-        1.0, 0.0, 0.0, 0.0,
-        0.0, f32::cos(radians), 0.0, f32::sin(radians),
-        0.0, 0.0, 1.0, 0.0,
-        0.0, -f32::sin(radians), 0.0, f32::cos(radians),
-    );
-    
-    return matrix;
-}
-
-fn xw_matrix(radians: f32) -> Matrix4<f32> {
-    let matrix = Matrix4::new(
-        f32::cos(radians), 0.0, 0.0, f32::sin(radians),
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
-        -f32::sin(radians), 0.0, 0.0, f32::cos(radians),
-    );
-    
-    return matrix;
-}
-
-fn generate_polytope_from_coxeter_diagram(vertices: &mut Vec<Vector4<f32>>, edges: &mut Vec<usize>, coxeter_edges: &Vec<u8>, coxeter_rings: &Vec<bool>) {
-    let mut angles: Vec<f32> = Vec::new();
-    
-    for weight in coxeter_edges {
-        // every angle is an nth of a half turn
-        angles.push(TAU / ((*weight * 2) as f32));
-    }
-    
-    let mut pre_matrix: Matrix4<f32> = Matrix4::identity();
-    
-    let rank = coxeter_edges.len() + 1;
-    
-    for i in 0..rank {
-        for j in 0..rank {
-            if i != j { // preserve diagonal
-                if i8::abs((i as i8) - (j as i8)) == 1 { // if the nodes are right next to each other, there's an edge connecting them
-                    pre_matrix[i * 4 + j] = f32::cos(angles[usize::min(i, j)]);
-                } // otherwise, the weight is 2, and cosine of 90 degrees is 0, and it's already 0
-            }
-        }
-    }
-    
-    let mirror_matrix: Matrix4<f32> = pre_matrix.cholesky().expect("invalid coxeter diagram").unpack().transpose();
-    
-    let mut point: Vector4<f32> = Vector4::new(0.0, 0.0, 0.0, 0.0);
-    
-    // thanks buzz for the wedge product
-    let fundamental_simplex = Matrix4::from_fn(|r, c| {
-            (-1f32).powi(r as i32) * mirror_matrix.remove_row(r).remove_column(c).determinant()
-        }
-    );
-    
-    let mut ringed_node_count = 0;
-    for i in 0..rank {
-        if coxeter_rings[i] {
-            point += fundamental_simplex.column(i);
-            ringed_node_count += 1;
-        }
-    }
-    point /= ringed_node_count as f32;
-    point = point.normalize();
-    
-    for i in 0..2048 {
-        vertices.push(point);
-        
-        let mirror_index= (rand() % rank as u32) as usize;
-        
-        point += -point.dot(&mirror_matrix.column(mirror_index)) * mirror_matrix.column(mirror_index) * 2.0;
-    }
-}
 
 fn draw_variable_width_line(start_point: Vector2<f32>, end_point: Vector2<f32>, start_radius: f32, end_radius: f32, color: Color) {
     let edge_direction = (end_point - start_point).normalize();
@@ -131,28 +43,30 @@ fn draw_variable_width_line(start_point: Vector2<f32>, end_point: Vector2<f32>, 
     );
 }
 
-#[macroquad::main("4D Renderer")]
+#[macroquad::main("nD Renderer")]
 async fn main() {
-    let mut vertices: Vec<Vector4<f32>> = Vec::new();
+    let mut dimension = 4;
+    
+    let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
     vertices = [
-        Vector4::new(-1.0, -1.0, -1.0, -1.0),
-        Vector4::new(1.0, -1.0, -1.0, -1.0),
-        Vector4::new(-1.0, 1.0, -1.0, -1.0),
-        Vector4::new(1.0, 1.0, -1.0, -1.0),
-        Vector4::new(-1.0, -1.0, 1.0, -1.0),
-        Vector4::new(1.0, -1.0, 1.0, -1.0),
-        Vector4::new(-1.0, 1.0, 1.0, -1.0),
-        Vector4::new(1.0, 1.0, 1.0, -1.0),
-        Vector4::new(-1.0, -1.0, -1.0, 1.0),
-        Vector4::new(1.0, -1.0, -1.0, 1.0),
-        Vector4::new(-1.0, 1.0, -1.0, 1.0),
-        Vector4::new(1.0, 1.0, -1.0, 1.0),
-        Vector4::new(-1.0, -1.0, 1.0, 1.0),
-        Vector4::new(1.0, -1.0, 1.0, 1.0),
-        Vector4::new(-1.0, 1.0, 1.0, 1.0),
-        Vector4::new(1.0, 1.0, 1.0, 1.0)
+        DVector::from_column_slice(&[-1.0, -1.0, -1.0, -1.0]),
+        DVector::from_column_slice(&[1.0, -1.0, -1.0, -1.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, -1.0, -1.0]),
+        DVector::from_column_slice(&[1.0, 1.0, -1.0, -1.0]),
+        DVector::from_column_slice(&[-1.0, -1.0, 1.0, -1.0]),
+        DVector::from_column_slice(&[1.0, -1.0, 1.0, -1.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, 1.0, -1.0]),
+        DVector::from_column_slice(&[1.0, 1.0, 1.0, -1.0]),
+        DVector::from_column_slice(&[-1.0, -1.0, -1.0, 1.0]),
+        DVector::from_column_slice(&[1.0, -1.0, -1.0, 1.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, -1.0, 1.0]),
+        DVector::from_column_slice(&[1.0, 1.0, -1.0, 1.0]),
+        DVector::from_column_slice(&[-1.0, -1.0, 1.0, 1.0]),
+        DVector::from_column_slice(&[1.0, -1.0, 1.0, 1.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, 1.0, 1.0]),
+        DVector::from_column_slice(&[1.0, 1.0, 1.0, 1.0])
     ].to_vec();
 
     edges = [
@@ -190,16 +104,17 @@ async fn main() {
         0b0111, 0b1111,
     ].to_vec();
     
-    let mut shape_matrix = Matrix4::new_scaling(1.0);
-    let mut shape_position = Vector4::new(0.0, 0.0, 0.0, 0.0);
-    
-    let mut camera_matrix = Matrix4::new_scaling(1.0);
-    let mut camera_position = Vector4::new(0.0, 0.0, -2.0, 0.0);
+    let mut shape_matrix = DMatrix::identity(dimension, dimension);
+    let mut shape_position = DVector::zeros(dimension);
+    shape_position[2] = 2.0;
     
     let mut render_size= 0.5;
     let mut edge_width= 1.0 / 84.0;
+    let mut zoom = 1.0;
     
     let mut previous_mouse_pos = Vector2::new(0.0, 0.0);
+    
+    let subdivisions = 4;
 
     loop {
         // Rotate Shape
@@ -209,11 +124,11 @@ async fn main() {
         
         if is_mouse_button_down(MouseButton::Left) || is_mouse_button_down(MouseButton::Middle) {
             if is_key_down(KeyCode::LeftControl) {
-                shape_matrix = xw_matrix((previous_mouse_pos.x - mouse_position().0) / -216.0) * shape_matrix;
-                shape_matrix = yw_matrix((previous_mouse_pos.y - mouse_position().1) / -216.0) * shape_matrix;
+                shape_matrix = rotate_matrix(0, 3, (previous_mouse_pos.x - mouse_position().0) / 216.0, dimension) * shape_matrix;
+                shape_matrix = rotate_matrix(1, 3, (previous_mouse_pos.y - mouse_position().1) / 216.0, dimension) * shape_matrix;
             } else {
-                shape_matrix = xz_matrix((previous_mouse_pos.x - mouse_position().0) / -216.0) * shape_matrix;
-                shape_matrix = yz_matrix((previous_mouse_pos.y - mouse_position().1) / -216.0) * shape_matrix;
+                shape_matrix = rotate_matrix(0, 2, (previous_mouse_pos.x - mouse_position().0) / 216.0, dimension) * shape_matrix;
+                shape_matrix = rotate_matrix(1, 2, (previous_mouse_pos.y - mouse_position().1) / 216.0, dimension) * shape_matrix;
             }
             
             (previous_mouse_pos.x, previous_mouse_pos.y) = mouse_position();
@@ -224,44 +139,37 @@ async fn main() {
             if is_key_down(KeyCode::LeftControl) {
                 render_size *= 12.0/13.0;
             } else {
-                camera_position.z *= 13.0/12.0;
+                shape_position[2] *= 13.0/12.0;
             }
         } else if scroll > 0.0 {
             if is_key_down(KeyCode::LeftControl) {
                 render_size *= 13.0/12.0;
             } else {
-                camera_position.z *= 12.0/13.0;
+                shape_position[2] *= 12.0/13.0;
             }
         }
-        camera_position.w = camera_position.z;
         
         
         clear_background(BLACK);
         
-        let inv_camera_matrix = camera_matrix.try_inverse().unwrap();
-        
         let mut projected_vertices: Vec<Vector2<f32>> = Vec::new();
-        let mut depth_of_vertices: Vec<f32> = Vec::new();
+        let mut local_space_vertices: Vec<DVector<f32>> = Vec::new();
         
         let screen_size = Vector2::new(screen_width(), screen_height());
 
         let mut index = 0;
         for vertex in &vertices {
-            // Vertex in world space
-            let mut transformed_vertex = (shape_matrix * vertex) + shape_position;
-            
-            // Vertex in camera space
-            transformed_vertex -= camera_position;
-            transformed_vertex = inv_camera_matrix * transformed_vertex;
+            // Vertex in world/camera space
+            let mut transformed_vertex = (&shape_matrix * vertex) + &shape_position;
             
             // Vertex in screen space
-            let mut screen_vertex = Vector2::new(transformed_vertex.x, transformed_vertex.y) / (transformed_vertex.z);
+            let mut screen_vertex = Vector2::new(transformed_vertex[0], transformed_vertex[1]) / (transformed_vertex[2]);
             screen_vertex *= -screen_height() * render_size;
             screen_vertex += screen_size / 2.0;
             
             // Store vertex result
             projected_vertices.push(screen_vertex);
-            depth_of_vertices.push(transformed_vertex.z);
+            local_space_vertices.push(transformed_vertex);
             index += 1;
         }
         
@@ -269,14 +177,14 @@ async fn main() {
             let vertex_a = Vector2::new(projected_vertices[edges[i]].x, projected_vertices[edges[i]].y);
             let vertex_b = Vector2::new(projected_vertices[edges[i + 1]].x, projected_vertices[edges[i + 1]].y);
             
-            let radius_a = ((screen_size.y * edge_width) / depth_of_vertices[edges[i]]);
-            let radius_b = ((screen_size.y * edge_width) / depth_of_vertices[edges[i + 1]]);
+            let radius_a = ((screen_size.y * edge_width) / local_space_vertices[edges[i]][2]);
+            let radius_b = ((screen_size.y * edge_width) / local_space_vertices[edges[i + 1]][2]);
             
             draw_variable_width_line(vertex_a, vertex_b, radius_a, radius_b, WHITE);
         }
         
         for i in (0..projected_vertices.len()) {
-            draw_circle(projected_vertices[i].x, projected_vertices[i].y, ((screen_size.y * edge_width) / depth_of_vertices[i]), WHITE);
+            draw_circle(projected_vertices[i].x, projected_vertices[i].y, ((screen_size.y * edge_width) / local_space_vertices[i][2]), WHITE);
         }
 
         next_frame().await
