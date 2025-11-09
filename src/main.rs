@@ -43,11 +43,30 @@ fn draw_variable_width_line(start_point: Vector2<f32>, end_point: Vector2<f32>, 
     );
 }
 
-fn mouse_control(previous_mouse_pos: Vector2<f32>, dimension: usize, shape_matrix: DMatrix<f32>, axis: usize) -> DMatrix<f32> {
+fn mouse_control(previous_mouse_pos: Vector2<f32>, dimension: usize, shape_matrix: DMatrix<f32>, axis: usize, sensitivity: f32) -> DMatrix<f32> {
     if axis < dimension {
-        return rotate_matrix(1, axis, (previous_mouse_pos.y - mouse_position().1) / 216.0, dimension) * rotate_matrix(0, axis, (previous_mouse_pos.x - mouse_position().0) / 216.0, dimension) * shape_matrix;
+        return rotate_matrix(1, axis, (previous_mouse_pos.y - mouse_position().1) * sensitivity, dimension) * rotate_matrix(0, axis, (previous_mouse_pos.x - mouse_position().0) * sensitivity, dimension) * shape_matrix;
     } else {
         return shape_matrix;
+    }
+}
+
+fn project_vertex(vertex: &DVector<f32>, render_size: f32, screen_size: Vector2<f32>) -> Vector2<f32> {
+    let mut screen_vertex = Vector2::new(vertex[0], vertex[1]) / (vertex[2]);
+    screen_vertex *= -screen_height() * render_size;
+    screen_vertex += screen_size / 2.0;
+    
+    screen_vertex
+}
+
+fn color_from_w(w: f32, w_scale: f32) -> Color {
+    let positive_w_component = f32::clamp(w * w_scale, 0.0, 1.0);
+    let negative_w_component = f32::clamp(-w * w_scale, 0.0, 1.0);
+    
+    if w > 0.0 {
+        return Color::new(1.0, f32::lerp(1.0, 0.5, positive_w_component), f32::lerp(1.0, 0.0, positive_w_component), 1.0 - positive_w_component);
+    } else {
+        return Color::new(f32::lerp(1.0, 0.0, negative_w_component), f32::lerp(1.0, 0.5, negative_w_component), 1.0, 1.0 - negative_w_component);
     }
 }
 
@@ -124,7 +143,7 @@ async fn main() {
     
     let mut previous_mouse_pos = Vector2::new(0.0, 0.0);
     
-    let subdivisions = 4;
+    let subdivisions = 16;
 
     loop {
         // Rotate Shape
@@ -134,17 +153,17 @@ async fn main() {
         
         if is_mouse_button_down(MouseButton::Left) || is_mouse_button_down(MouseButton::Middle) {
             if is_key_down(KeyCode::Z) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 4);
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 4, -1.0/216.0);
             } else if is_key_down(KeyCode::X) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 5);
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 5, -1.0/216.0);
             } else if is_key_down(KeyCode::C) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 6);
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 6, -1.0/216.0);
             } else if is_key_down(KeyCode::V) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 7);
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 7, -1.0/216.0);
             } else if is_key_down(KeyCode::LeftControl) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 3);
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 3, -1.0/216.0);
             } else {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 2);
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 2, 1.0/216.0);
             }
             
             (previous_mouse_pos.x, previous_mouse_pos.y) = mouse_position();
@@ -168,39 +187,41 @@ async fn main() {
         
         clear_background(BLACK);
         
-        let mut projected_vertices: Vec<Vector2<f32>> = Vec::new();
         let mut local_space_vertices: Vec<DVector<f32>> = Vec::new();
         
         let screen_size = Vector2::new(screen_width(), screen_height());
 
-        let mut index = 0;
         for vertex in &vertices {
             // Vertex in world/camera space
-            let mut transformed_vertex = (&shape_matrix * vertex) + &shape_position;
-            
-            // Vertex in screen space
-            let mut screen_vertex = Vector2::new(transformed_vertex[0], transformed_vertex[1]) / (transformed_vertex[2]);
-            screen_vertex *= -screen_height() * render_size;
-            screen_vertex += screen_size / 2.0;
+            let transformed_vertex = (&shape_matrix * vertex) + &shape_position;
             
             // Store vertex result
-            projected_vertices.push(screen_vertex);
             local_space_vertices.push(transformed_vertex);
-            index += 1;
         }
         
         for i in (0..edges.len()).step_by(2) {
-            let vertex_a = Vector2::new(projected_vertices[edges[i]].x, projected_vertices[edges[i]].y);
-            let vertex_b = Vector2::new(projected_vertices[edges[i + 1]].x, projected_vertices[edges[i + 1]].y);
+            // A and B are the ends of the edges, 1 and 2 are the ends of the sub edges
+            let vertex_a = &local_space_vertices[edges[i]];
+            let vertex_b = &local_space_vertices[edges[i + 1]];
             
-            let radius_a = ((screen_size.y * edge_width) / local_space_vertices[edges[i]][2]);
-            let radius_b = ((screen_size.y * edge_width) / local_space_vertices[edges[i + 1]][2]);
+            for s in 0..subdivisions {
+                let vertex_1 = vertex_a.lerp(&vertex_b, (s as f32) / (subdivisions as f32));
+                let vertex_2 = vertex_a.lerp(&vertex_b, ((s + 1) as f32) / (subdivisions as f32));
+                
+                let radius_1 = ((screen_size.y * edge_width) / vertex_1[2]);
+                let radius_2 = ((screen_size.y * edge_width) / vertex_2[2]);
+                
+                let edge_center = vertex_a.lerp(&vertex_b, (s as f32) / ((subdivisions - 1) as f32));
+                
+                draw_variable_width_line(project_vertex(&vertex_1, render_size, screen_size), project_vertex(&vertex_2, render_size, screen_size), radius_1, radius_2, color_from_w(edge_center[3], 0.5));
+            }
             
-            draw_variable_width_line(vertex_a, vertex_b, radius_a, radius_b, WHITE);
         }
         
-        for i in (0..projected_vertices.len()) {
-            draw_circle(projected_vertices[i].x, projected_vertices[i].y, ((screen_size.y * edge_width) / local_space_vertices[i][2]), WHITE);
+        for i in (0..local_space_vertices.len()) {
+            let coord = project_vertex(&local_space_vertices[i], render_size, screen_size);
+            
+            draw_circle(coord.x, coord.y, ((screen_size.y * edge_width) / local_space_vertices[i][2]), color_from_w(local_space_vertices[i][3], 0.5));
         }
 
         next_frame().await
