@@ -76,29 +76,29 @@ fn fade_from_depth(z: f32, near: f32, far: f32, zoom: f32) -> f32 {
 
 #[macroquad::main("nD Renderer")]
 async fn main() {
-    let mut dimension = 5;
+    let mut dimension = 4;
     
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
     vertices = [
-        DVector::from_column_slice(&[-1.0, -1.0, -1.0, -1.0, 0.0]),
-        DVector::from_column_slice(&[1.0, -1.0, -1.0, -1.0, 0.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, -1.0, -1.0, 0.0]),
-        DVector::from_column_slice(&[1.0, 1.0, -1.0, -1.0, 0.0]),
-        DVector::from_column_slice(&[-1.0, -1.0, 1.0, -1.0, 0.0]),
-        DVector::from_column_slice(&[1.0, -1.0, 1.0, -1.0, 0.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, 1.0, -1.0, 0.0]),
-        DVector::from_column_slice(&[1.0, 1.0, 1.0, -1.0, 0.0]),
-        DVector::from_column_slice(&[-1.0, -1.0, -1.0, 1.0, 0.0]),
-        DVector::from_column_slice(&[1.0, -1.0, -1.0, 1.0, 0.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, -1.0, 1.0, 0.0]),
-        DVector::from_column_slice(&[1.0, 1.0, -1.0, 1.0, 0.0]),
-        DVector::from_column_slice(&[-1.0, -1.0, 1.0, 1.0, 0.0]),
-        DVector::from_column_slice(&[1.0, -1.0, 1.0, 1.0, 0.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, 1.0, 1.0, 0.0]),
-        DVector::from_column_slice(&[1.0, 1.0, 1.0, 1.0, 0.0]),
-        DVector::from_column_slice(&[-1.0, -1.0, -1.0, -1.0, 1.0])
+        DVector::from_column_slice(&[-1.0, -1.0, -1.0, -1.0]),
+        DVector::from_column_slice(&[1.0, -1.0, -1.0, -1.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, -1.0, -1.0]),
+        DVector::from_column_slice(&[1.0, 1.0, -1.0, -1.0]),
+        DVector::from_column_slice(&[-1.0, -1.0, 1.0, -1.0]),
+        DVector::from_column_slice(&[1.0, -1.0, 1.0, -1.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, 1.0, -1.0]),
+        DVector::from_column_slice(&[1.0, 1.0, 1.0, -1.0]),
+        DVector::from_column_slice(&[-1.0, -1.0, -1.0, 1.0]),
+        DVector::from_column_slice(&[1.0, -1.0, -1.0, 1.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, -1.0, 1.0]),
+        DVector::from_column_slice(&[1.0, 1.0, -1.0, 1.0]),
+        DVector::from_column_slice(&[-1.0, -1.0, 1.0, 1.0]),
+        DVector::from_column_slice(&[1.0, -1.0, 1.0, 1.0]),
+        DVector::from_column_slice(&[-1.0, 1.0, 1.0, 1.0]),
+        DVector::from_column_slice(&[1.0, 1.0, 1.0, 1.0]),
+        DVector::from_column_slice(&[-1.0, -1.0, -1.0, -1.0])
     ].to_vec();
 
     edges = [
@@ -133,8 +133,7 @@ async fn main() {
         0b0100, 0b1100,
         0b0101, 0b1101,
         0b0110, 0b1110,
-        0b0111, 0b1111,
-        0b0000, 0b10000
+        0b0111, 0b1111
     ].to_vec();
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
@@ -181,17 +180,34 @@ async fn main() {
         if scroll < 0.0 {
             if is_key_down(KeyCode::LeftControl) {
                 render_size *= 12.0/13.0;
+            } else if is_key_down(KeyCode::LeftShift) {
+                edge_width *= 12.0/13.0;
             } else {
                 zoom *= 13.0/12.0;
             }
         } else if scroll > 0.0 {
             if is_key_down(KeyCode::LeftControl) {
                 render_size *= 13.0/12.0;
+            } else if is_key_down(KeyCode::LeftShift) {
+                edge_width *= 13.0/12.0;
             } else {
                 zoom *= 12.0/13.0;
             }
         }
         shape_position[2] = zoom;
+        
+        if is_key_down(KeyCode::Q) {
+            near += get_frame_time();
+        }
+        if is_key_down(KeyCode::A) {
+            near -= get_frame_time();
+        }
+        if is_key_down(KeyCode::W) {
+            far += get_frame_time();
+        }
+        if is_key_down(KeyCode::S) {
+            far -= get_frame_time();
+        }
         
         
         clear_background(BLACK);
