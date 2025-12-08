@@ -154,6 +154,57 @@ fn color_from_w(w: f32, w_scale: f32) -> Color {
     }
 }
 
+fn distance_from_volume(vertex: &DVector<f32>) -> f32 {
+    let mut distance: f32 = 0.0;
+    for axis in 0..(vertex.len() - 3) {
+        distance += vertex[axis + 3] * vertex[axis + 3];
+    }
+    
+    f32::sqrt(distance)
+}
+
+fn distance_from_4volume(vertex: &DVector<f32>) -> f32 {
+    let mut distance: f32 = 0.0;
+    for axis in 0..(vertex.len() - 4) {
+        distance += vertex[axis + 4] * vertex[axis + 4];
+    }
+    
+    f32::sqrt(distance)
+}
+
+fn color_from_off_axis(vertex: &DVector<f32>, w_scale: f32, dimension: usize) -> Color {
+    let mut color = Color { r: 0.5, g: 0.5, b: 0.5, a: 1.0 };
+    
+    let mut distance: f32 = 0.0;
+    let mut off_axis: Vec<f32> = vec![];
+    for axis in 0..(dimension - 3) {
+        distance += vertex[axis + 3] * vertex[axis + 3];
+        off_axis.push(vertex[axis + 3]);
+    }
+    distance = f32::sqrt(distance);
+    
+    for axis in 0..(dimension - 3) {
+        off_axis[axis] /= distance * 2.0;
+        off_axis[axis] *= w_scale;
+        off_axis[axis] += 0.5;
+    }
+    
+    if dimension > 3 {
+        color.r = off_axis[0];
+    }
+    if dimension > 4 {
+        color.g = off_axis[1];
+    }
+    if dimension > 5 {
+        color.b = off_axis[2];
+    }
+    // if dimension > 6 {
+    //     color.a *= off_axis[3];
+    // }
+    
+    color
+}
+
 fn fade_from_depth(z: f32, near: f32, far: f32, zoom: f32) -> f32 {
     1.0 - clamp(f32::inverse_lerp(near + zoom, far + zoom, z), 0.0, 1.0)
 }
@@ -240,10 +291,10 @@ async fn main() {
             far -= get_frame_time();
         }
         if is_key_down(KeyCode::E) {
-            w_scale *= 1.0 + get_frame_time();
+            w_scale *= 1.0 - get_frame_time();
         }
         if is_key_down(KeyCode::D) {
-            w_scale *= 1.0 - get_frame_time();
+            w_scale *= 1.0 + get_frame_time();
         }
         
         clear_background(BLACK);
@@ -275,20 +326,25 @@ async fn main() {
                 let edge_center = vertex_a.lerp(&vertex_b, (s as f32) / ((subdivisions - 1) as f32));
                 
                 let mut color = color_from_w(edge_center[3], w_scale);
+                // let mut color = color_from_off_axis(&edge_center, w_scale, dimension);
                 color.a *= fade_from_depth(edge_center[2], near, far, zoom);
+                color.a *= 1.0 - (distance_from_4volume(&edge_center) * w_scale).clamp(0.0, 1.0);
                 
                 draw_variable_width_line(project_vertex(&vertex_1, render_size, screen_size), project_vertex(&vertex_2, render_size, screen_size), radius_1, radius_2, color);
             }
             
         }
         
-        for i in (0..local_space_vertices.len()) {
+        for i in 0..local_space_vertices.len() {
             let coord = project_vertex(&local_space_vertices[i], render_size, screen_size);
             
             let mut color = color_from_w(local_space_vertices[i][3], w_scale);
-            color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
+            // let mut color = color_from_off_axis(&local_space_vertices[i], w_scale, dimension);
             
-            draw_circle(coord.x, coord.y, ((screen_size.y * edge_width) / local_space_vertices[i][2]), color);
+            color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
+            color.a *= 1.0 - (distance_from_4volume(&local_space_vertices[i]) * w_scale).clamp(0.0, 1.0);
+            
+            draw_circle(coord.x, coord.y, (screen_size.y * edge_width) / local_space_vertices[i][2], color);
         }
 
         next_frame().await
