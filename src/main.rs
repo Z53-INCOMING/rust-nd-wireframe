@@ -232,7 +232,7 @@ async fn main() {
     
     let mut previous_mouse_pos = Vector2::new(0.0, 0.0);
     
-    let subdivisions = 6;
+    let mut subdivisions = 6;
 
     loop {
         // Rotate Shape
