@@ -232,7 +232,7 @@ async fn main() {
     
     let mut previous_mouse_pos = Vector2::new(0.0, 0.0);
     
-    let subdivisions = 16;
+    let subdivisions = 6;
 
     loop {
         // Rotate Shape
@@ -295,6 +295,12 @@ async fn main() {
         }
         if is_key_down(KeyCode::D) {
             w_scale *= 1.0 + get_frame_time();
+        }
+        if is_key_pressed(KeyCode::R) {
+            subdivisions += 1;
+        }
+        if is_key_pressed(KeyCode::F) {
+            subdivisions -= 1;
         }
         
         clear_background(BLACK);
