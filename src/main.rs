@@ -1,9 +1,11 @@
 use macroquad::prelude::*;
 use na::Vector2;
+use nalgebra::dvector;
 use nalgebra::{self as na, DMatrix, DVector};
 use std;
 use std::f32::consts::TAU;
 use std::fs::File;
+use std::fs::read_to_string;
 
 fn rotate_matrix(axis_1: usize, axis_2: usize, angle_in_radians: f32, dimension: usize) -> DMatrix<f32> {
     let mut matrix = DMatrix::identity(dimension, dimension);
@@ -17,11 +19,93 @@ fn rotate_matrix(axis_1: usize, axis_2: usize, angle_in_radians: f32, dimension:
     return matrix;
 }
 
-fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>) {
+fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>, dimension: &mut usize) {
+    if !std::path::Path::new(&path).exists() {
+        return
+    }
+
+    let contents = std::fs::read_to_string(path).unwrap();
     
+    let mut state: u8 = 0;
+    
+    for line in contents.lines() {
+        if line.starts_with("#") {
+            continue;
+        }
+        
+        if line.is_empty() {
+            if state == 1 {
+                state = 2;
+                continue;
+            } else if state == 2 {
+                state = 3;
+                continue;
+            } else if state == 3 {
+                break;
+            }
+        }
+        
+        if line.ends_with("OFF") {
+            *dimension = line[.. line.len() - 3].parse().unwrap();
+            state = 1;
+            continue;
+        }
+        
+        // Vertices
+        if state == 2 {
+            let mut vertex: Vec<f32> = vec![];
+            
+            for coordinate in line.split(" ") {
+                vertex.push(coordinate.parse().unwrap());
+            }
+            
+            vertices.push(DVector::from_vec(vertex));
+        }
+        
+        // Edges (actually faces)
+        if state == 3 {
+            // stores the vertex indices of the face
+            let mut face: Vec<usize> = vec![];
+            
+            // go through the line of text to find the indices
+            let mut index = 0;
+            for number_string in line.split(" ") {
+                let number: usize = number_string.parse().unwrap();
+                
+                // the first one is the size of the face. who needs that? I have .len() and I'm not afraid to use it.
+                if index != 0 {
+                    face.push(number);
+                }
+                
+                index += 1;
+            }
+            
+            // loop through the face to get all the edges
+            for index in 0..face.len() {
+                let vertex_index_a = face[index];
+                let vertex_index_b = face[(index + 1) % face.len()];
+                
+                // make sure the edge or its opposite aren't in the edges array
+                let mut found_duplicate = false;
+                for edge_start_index in (0..edges.len()).step_by(2) {
+                    let edge_start = edges[edge_start_index];
+                    let edge_end = edges[edge_start_index + 1];
+                    
+                    if (vertex_index_a == edge_start && vertex_index_b == edge_end) || (vertex_index_a == edge_end && vertex_index_b == edge_start) {
+                        found_duplicate = true;
+                        break;
+                    }
+                }
+                
+                // add them
+                if !found_duplicate {
+                    edges.push(vertex_index_a);
+                    edges.push(vertex_index_b);
+                }
+            }
+        }
+    }
 }
-
-
 
 fn draw_variable_width_line(start_point: Vector2<f32>, end_point: Vector2<f32>, start_radius: f32, end_radius: f32, color: Color) {
     let edge_direction = (end_point - start_point).normalize();
@@ -76,65 +160,12 @@ fn fade_from_depth(z: f32, near: f32, far: f32, zoom: f32) -> f32 {
 
 #[macroquad::main("nD Renderer")]
 async fn main() {
-    let mut dimension = 4;
+    let mut dimension = 0;
     
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    vertices = [
-        DVector::from_column_slice(&[-1.0, -1.0, -1.0, -1.0]),
-        DVector::from_column_slice(&[1.0, -1.0, -1.0, -1.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, -1.0, -1.0]),
-        DVector::from_column_slice(&[1.0, 1.0, -1.0, -1.0]),
-        DVector::from_column_slice(&[-1.0, -1.0, 1.0, -1.0]),
-        DVector::from_column_slice(&[1.0, -1.0, 1.0, -1.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, 1.0, -1.0]),
-        DVector::from_column_slice(&[1.0, 1.0, 1.0, -1.0]),
-        DVector::from_column_slice(&[-1.0, -1.0, -1.0, 1.0]),
-        DVector::from_column_slice(&[1.0, -1.0, -1.0, 1.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, -1.0, 1.0]),
-        DVector::from_column_slice(&[1.0, 1.0, -1.0, 1.0]),
-        DVector::from_column_slice(&[-1.0, -1.0, 1.0, 1.0]),
-        DVector::from_column_slice(&[1.0, -1.0, 1.0, 1.0]),
-        DVector::from_column_slice(&[-1.0, 1.0, 1.0, 1.0]),
-        DVector::from_column_slice(&[1.0, 1.0, 1.0, 1.0]),
-        DVector::from_column_slice(&[-1.0, -1.0, -1.0, -1.0])
-    ].to_vec();
-
-    edges = [
-        0b0000, 0b0001,
-        0b0000, 0b0010,
-        0b0001, 0b0011,
-        0b0010, 0b0011,
-        0b0100, 0b0101,
-        0b0100, 0b0110,
-        0b0101, 0b0111,
-        0b0110, 0b0111,
-        0b0000, 0b0100,
-        0b0001, 0b0101,
-        0b0010, 0b0110,
-        0b0011, 0b0111,
-        0b1000, 0b1001,
-        0b1000, 0b1010,
-        0b1001, 0b1011,
-        0b1010, 0b1011,
-        0b1100, 0b1101,
-        0b1100, 0b1110,
-        0b1101, 0b1111,
-        0b1110, 0b1111,
-        0b1000, 0b1100,
-        0b1001, 0b1101,
-        0b1010, 0b1110,
-        0b1011, 0b1111,
-        0b0000, 0b1000,
-        0b0001, 0b1001,
-        0b0010, 0b1010,
-        0b0011, 0b1011,
-        0b0100, 0b1100,
-        0b0101, 0b1101,
-        0b0110, 0b1110,
-        0b0111, 0b1111
-    ].to_vec();
+    load_polytope("./hexelte.off".to_string(), &mut vertices, &mut edges, &mut dimension);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
@@ -208,7 +239,12 @@ async fn main() {
         if is_key_down(KeyCode::S) {
             far -= get_frame_time();
         }
-        
+        if is_key_down(KeyCode::E) {
+            w_scale *= 1.0 + get_frame_time();
+        }
+        if is_key_down(KeyCode::D) {
+            w_scale *= 1.0 - get_frame_time();
+        }
         
         clear_background(BLACK);
         
