@@ -211,6 +211,58 @@ fn fade_from_depth(z: f32, near: f32, far: f32, zoom: f32) -> f32 {
     1.0 - clamp(f32::inverse_lerp(near + zoom, far + zoom, z), 0.0, 1.0)
 }
 
+fn render(vertices: &Vec<DVector<f32>>, edges: &Vec<usize>, subdivisions: i32, shape_matrix: &DMatrix<f32>, shape_position: &DVector<f32>, edge_width: f32, near: f32, far: f32, zoom: f32, w_scale: f32, render_size: f32) {
+    clear_background(BLACK);
+    
+    let mut local_space_vertices: Vec<DVector<f32>> = Vec::new();
+    
+    let screen_size = Vector2::new(screen_width(), screen_height());
+
+    for vertex in vertices {
+        // Vertex in world/camera space
+        let transformed_vertex = (shape_matrix * vertex) + shape_position;
+        
+        // Store vertex result
+        local_space_vertices.push(transformed_vertex);
+    }
+    
+    for i in (0..edges.len()).step_by(2) {
+        // A and B are the ends of the edges, 1 and 2 are the ends of the sub edges
+        let vertex_a = &local_space_vertices[edges[i]];
+        let vertex_b = &local_space_vertices[edges[i + 1]];
+        
+        for s in 0..subdivisions {
+            let vertex_1 = vertex_a.lerp(&vertex_b, (s as f32) / (subdivisions as f32));
+            let vertex_2 = vertex_a.lerp(&vertex_b, ((s + 1) as f32) / (subdivisions as f32));
+            
+            let radius_1 = ((screen_size.y * edge_width) / vertex_1[2]);
+            let radius_2 = ((screen_size.y * edge_width) / vertex_2[2]);
+            
+            let edge_center = vertex_a.lerp(&vertex_b, (s as f32) / ((subdivisions - 1) as f32));
+            
+            let mut color = color_from_w(edge_center[3], w_scale);
+            // let mut color = color_from_off_axis(&edge_center, w_scale, dimension);
+            color.a *= fade_from_depth(edge_center[2], near, far, zoom);
+            color.a *= 1.0 - (distance_from_4volume(&edge_center) * w_scale).clamp(0.0, 1.0);
+            
+            draw_variable_width_line(project_vertex(&vertex_1, render_size, screen_size), project_vertex(&vertex_2, render_size, screen_size), radius_1 * render_size, radius_2 * render_size, color);
+        }
+        
+    }
+    
+    for i in 0..local_space_vertices.len() {
+        let coord = project_vertex(&local_space_vertices[i], render_size, screen_size);
+        
+        let mut color = color_from_w(local_space_vertices[i][3], w_scale);
+        // let mut color = color_from_off_axis(&local_space_vertices[i], w_scale, dimension);
+        
+        color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
+        color.a *= 1.0 - (distance_from_4volume(&local_space_vertices[i]) * w_scale).clamp(0.0, 1.0);
+        
+        draw_circle(coord.x, coord.y, (screen_size.y * edge_width * render_size) / local_space_vertices[i][2], color);
+    }
+}
+
 #[macroquad::main("nD Renderer")]
 async fn main() {
     let mut dimension = 0;
@@ -305,55 +357,7 @@ async fn main() {
             subdivisions -= 1;
         }
         
-        clear_background(BLACK);
-        
-        let mut local_space_vertices: Vec<DVector<f32>> = Vec::new();
-        
-        let screen_size = Vector2::new(screen_width(), screen_height());
-
-        for vertex in &vertices {
-            // Vertex in world/camera space
-            let transformed_vertex = (&shape_matrix * vertex) + &shape_position;
-            
-            // Store vertex result
-            local_space_vertices.push(transformed_vertex);
-        }
-        
-        for i in (0..edges.len()).step_by(2) {
-            // A and B are the ends of the edges, 1 and 2 are the ends of the sub edges
-            let vertex_a = &local_space_vertices[edges[i]];
-            let vertex_b = &local_space_vertices[edges[i + 1]];
-            
-            for s in 0..subdivisions {
-                let vertex_1 = vertex_a.lerp(&vertex_b, (s as f32) / (subdivisions as f32));
-                let vertex_2 = vertex_a.lerp(&vertex_b, ((s + 1) as f32) / (subdivisions as f32));
-                
-                let radius_1 = ((screen_size.y * edge_width) / vertex_1[2]);
-                let radius_2 = ((screen_size.y * edge_width) / vertex_2[2]);
-                
-                let edge_center = vertex_a.lerp(&vertex_b, (s as f32) / ((subdivisions - 1) as f32));
-                
-                let mut color = color_from_w(edge_center[3], w_scale);
-                // let mut color = color_from_off_axis(&edge_center, w_scale, dimension);
-                color.a *= fade_from_depth(edge_center[2], near, far, zoom);
-                color.a *= 1.0 - (distance_from_4volume(&edge_center) * w_scale).clamp(0.0, 1.0);
-                
-                draw_variable_width_line(project_vertex(&vertex_1, render_size, screen_size), project_vertex(&vertex_2, render_size, screen_size), radius_1 * render_size, radius_2 * render_size, color);
-            }
-            
-        }
-        
-        for i in 0..local_space_vertices.len() {
-            let coord = project_vertex(&local_space_vertices[i], render_size, screen_size);
-            
-            let mut color = color_from_w(local_space_vertices[i][3], w_scale);
-            // let mut color = color_from_off_axis(&local_space_vertices[i], w_scale, dimension);
-            
-            color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
-            color.a *= 1.0 - (distance_from_4volume(&local_space_vertices[i]) * w_scale).clamp(0.0, 1.0);
-            
-            draw_circle(coord.x, coord.y, (screen_size.y * edge_width * render_size) / local_space_vertices[i][2], color);
-        }
+        render(&vertices, &edges, subdivisions, &shape_matrix, &shape_position, edge_width, near, far, zoom, w_scale, render_size);
 
         next_frame().await
     }
