@@ -56,7 +56,9 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
             let mut vertex: Vec<f32> = vec![];
             
             for coordinate in line.split(" ") {
-                vertex.push(coordinate.parse().unwrap());
+                if !coordinate.is_empty() {
+                    vertex.push(coordinate.parse().unwrap());
+                }
             }
             
             vertices.push(DVector::from_vec(vertex));
@@ -216,7 +218,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./hexelte.off".to_string(), &mut vertices, &mut edges, &mut dimension);
+    load_polytope("./120-cell.off".to_string(), &mut vertices, &mut edges, &mut dimension);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
@@ -336,7 +338,7 @@ async fn main() {
                 color.a *= fade_from_depth(edge_center[2], near, far, zoom);
                 color.a *= 1.0 - (distance_from_4volume(&edge_center) * w_scale).clamp(0.0, 1.0);
                 
-                draw_variable_width_line(project_vertex(&vertex_1, render_size, screen_size), project_vertex(&vertex_2, render_size, screen_size), radius_1, radius_2, color);
+                draw_variable_width_line(project_vertex(&vertex_1, render_size, screen_size), project_vertex(&vertex_2, render_size, screen_size), radius_1 * render_size, radius_2 * render_size, color);
             }
             
         }
@@ -350,7 +352,7 @@ async fn main() {
             color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
             color.a *= 1.0 - (distance_from_4volume(&local_space_vertices[i]) * w_scale).clamp(0.0, 1.0);
             
-            draw_circle(coord.x, coord.y, (screen_size.y * edge_width) / local_space_vertices[i][2], color);
+            draw_circle(coord.x, coord.y, (screen_size.y * edge_width * render_size) / local_space_vertices[i][2], color);
         }
 
         next_frame().await
