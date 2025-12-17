@@ -291,8 +291,8 @@ async fn main() {
     
     let mut subdivisions = 6;
     
-    let mut image_index = -1;
-    let frame_count = 60;
+    let mut image_index = -2;
+    let frame_count = 120;
     
     set_window_size(1024, 1024);
 
@@ -367,23 +367,28 @@ async fn main() {
         
         render(&vertices, &edges, subdivisions, &shape_matrix, &shape_position, edge_width, near, far, zoom, w_scale, render_size);
         
-        if is_key_pressed(KeyCode::Enter) {
-            image_index = 0;
-        }
-        
         if image_index > -1 { // During the loop
-            shape_matrix = rotate_matrix(2, 0, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
+            shape_matrix = rotate_matrix(3, 0, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
             
             get_screen_data().export_png(&format!("./images/{:03}.png", image_index));
             
             image_index += 1;
         }
+        if image_index == -1 {
+            image_index = 0;
+        }
         
         if image_index == frame_count { // End
             set_default_camera();
-            image_index = -1;
+            image_index = -2;
+            set_window_size(1024, 1024);
         }
-
+        
+        if is_key_pressed(KeyCode::Enter) {
+            image_index = -1;
+            set_window_size(360, 360);
+        }
+        
         next_frame().await
     }
 }
