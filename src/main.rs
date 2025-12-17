@@ -148,11 +148,15 @@ fn project_vertex(vertex: &DVector<f32>, render_size: f32, screen_size: Vector2<
     screen_vertex
 }
 
-fn color_from_w(w: f32, w_scale: f32) -> Color {
-    let positive_w_component = f32::clamp(w * w_scale, 0.0, 1.0);
-    let negative_w_component = f32::clamp(-w * w_scale, 0.0, 1.0);
+fn color_from_w(vector: &DVector<f32>, w_scale: f32) -> Color {
+    if vector.len() < 4 {
+        return WHITE;
+    }
     
-    if w > 0.0 {
+    let positive_w_component = f32::clamp(vector[3] * w_scale, 0.0, 1.0);
+    let negative_w_component = f32::clamp(-vector[3] * w_scale, 0.0, 1.0);
+    
+    if vector[3] > 0.0 {
         return Color::new(1.0, f32::lerp(1.0, 0.5, positive_w_component), f32::lerp(1.0, 0.0, positive_w_component), 1.0 - positive_w_component);
     } else {
         return Color::new(f32::lerp(1.0, 0.0, negative_w_component), f32::lerp(1.0, 0.5, negative_w_component), 1.0, 1.0 - negative_w_component);
@@ -169,6 +173,10 @@ fn distance_from_volume(vertex: &DVector<f32>) -> f32 {
 }
 
 fn distance_from_4volume(vertex: &DVector<f32>) -> f32 {
+    if vertex.len() < 4 {
+        return 0.0;
+    }
+    
     let mut distance: f32 = 0.0;
     for axis in 0..(vertex.len() - 4) {
         distance += vertex[axis + 4] * vertex[axis + 4];
@@ -178,6 +186,10 @@ fn distance_from_4volume(vertex: &DVector<f32>) -> f32 {
 }
 
 fn color_from_off_axis(vertex: &DVector<f32>, w_scale: f32, dimension: usize) -> Color {
+    if dimension < 4 {
+        return WHITE;
+    }
+    
     let mut color = Color { r: 0.5, g: 0.5, b: 0.5, a: 1.0 };
     
     let mut distance: f32 = 0.0;
@@ -243,7 +255,7 @@ fn render(vertices: &Vec<DVector<f32>>, edges: &Vec<usize>, subdivisions: i32, s
             
             let edge_center = vertex_a.lerp(&vertex_b, (s as f32) / ((subdivisions - 1) as f32));
             
-            let mut color = color_from_w(edge_center[3], w_scale);
+            let mut color = if shape_matrix.ncols() < 4 {WHITE} else {color_from_w(&edge_center, w_scale)};
             // let mut color = color_from_off_axis(&edge_center, w_scale, dimension);
             color.a *= fade_from_depth(edge_center[2], near, far, zoom);
             color.a *= 1.0 - (distance_from_4volume(&edge_center) * w_scale).clamp(0.0, 1.0);
@@ -256,7 +268,7 @@ fn render(vertices: &Vec<DVector<f32>>, edges: &Vec<usize>, subdivisions: i32, s
     for i in 0..local_space_vertices.len() {
         let coord = project_vertex(&local_space_vertices[i], render_size, screen_size);
         
-        let mut color = color_from_w(local_space_vertices[i][3], w_scale);
+        let mut color = color_from_w(&local_space_vertices[i], w_scale);
         // let mut color = color_from_off_axis(&local_space_vertices[i], w_scale, dimension);
         
         color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
@@ -273,7 +285,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./120-cell.off".to_string(), &mut vertices, &mut edges, &mut dimension);
+    load_polytope("./5 op dodecahedron and icosahedron.off".to_string(), &mut vertices, &mut edges, &mut dimension);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
@@ -368,7 +380,7 @@ async fn main() {
         render(&vertices, &edges, subdivisions, &shape_matrix, &shape_position, edge_width, near, far, zoom, w_scale, render_size);
         
         if image_index > -1 { // During the loop
-            shape_matrix = rotate_matrix(3, 0, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
+            shape_matrix = rotate_matrix(0, 2, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
             
             get_screen_data().export_png(&format!("./images/{:03}.png", image_index));
             
@@ -386,7 +398,7 @@ async fn main() {
         
         if is_key_pressed(KeyCode::Enter) {
             image_index = -1;
-            set_window_size(360, 360);
+            set_window_size(540, 540);
         }
         
         next_frame().await
