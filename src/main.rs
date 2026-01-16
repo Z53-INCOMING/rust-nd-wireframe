@@ -31,28 +31,39 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
     
     let mut state: u8 = 0;
     
+    let mut full_lines_seen = 0;
+    
     for line in contents.lines() {
         if line.starts_with("#") {
             continue;
         }
         
         if line.is_empty() {
-            if state == 1 {
-                state = 2;
-                continue;
-            } else if state == 2 {
+            if state == 1 { // If done reading rank, start reading vertices
+                if full_lines_seen == 1 {
+                    state = 2;
+                    continue;
+                } else {
+                    continue;
+                }
+            } else if state == 2 { // If done reading vertices, start reading edges (faces)
                 state = 3;
                 continue;
-            } else if state == 3 {
+            } else if state == 3 { // If done reading edges (faces), stop
                 break;
             }
         }
         
         if line.ends_with("OFF") {
             *dimension = line[.. line.len() - 3].parse().unwrap();
+            if *dimension < 4 {
+                *dimension = 4;
+            }
             state = 1;
             continue;
         }
+        
+        full_lines_seen += 1;
         
         // Vertices
         if state == 2 {
@@ -62,6 +73,10 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
                 if !coordinate.is_empty() {
                     vertex.push(coordinate.parse().unwrap());
                 }
+            }
+            
+            while vertex.len() < 4 {
+                vertex.push(0.0);
             }
             
             vertices.push(DVector::from_vec(vertex));
@@ -285,7 +300,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./5 op dodecahedron and icosahedron.off".to_string(), &mut vertices, &mut edges, &mut dimension);
+    load_polytope("./3 op icosahedron.off".to_string(), &mut vertices, &mut edges, &mut dimension);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
@@ -381,6 +396,8 @@ async fn main() {
         
         if image_index > -1 { // During the loop
             shape_matrix = rotate_matrix(0, 2, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
+            shape_matrix = rotate_matrix(1, 4, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
+            // shape_matrix = rotate_matrix(1, 3, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
             
             get_screen_data().export_png(&format!("./images/{:03}.png", image_index));
             
@@ -398,8 +415,10 @@ async fn main() {
         
         if is_key_pressed(KeyCode::Enter) {
             image_index = -1;
-            set_window_size(540, 540);
+            set_window_size(360, 360);
         }
+        
+        // println!("{}", shape_position[2]);
         
         next_frame().await
     }
