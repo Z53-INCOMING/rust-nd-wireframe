@@ -3,7 +3,6 @@ use macroquad::miniquad::window::set_window_size;
 use macroquad::prelude::*;
 use macroquad::rand::rand;
 use na::Vector2;
-use nalgebra::dvector;
 use nalgebra::{self as na, DMatrix, DVector};
 use std;
 use std::f32::consts::TAU;
@@ -163,38 +162,55 @@ fn project_vertex(vertex: &DVector<f32>, render_size: f32, screen_size: Vector2<
     screen_vertex
 }
 
-fn color_from_w(vector: &DVector<f32>, w_scale: f32) -> Color {
+fn color_from_hue(hue: f32) -> Color {
+    let kr = f32::fract((5.0 + hue * 6.0) / 6.0) * 6.0;
+    let kg = f32::fract((3.0 + hue * 6.0) / 6.0) * 6.0;
+    let kb = f32::fract((1.0 + hue * 6.0) / 6.0) * 6.0;
+    
+    let r = 1.0 - f32::max(f32::min(f32::min(kr, 4.0 - kr), 1.0), 0.0);
+    let g = 1.0 - f32::max(f32::min(f32::min(kg, 4.0 - kg), 1.0), 0.0);
+    let b = 1.0 - f32::max(f32::min(f32::min(kb, 4.0 - kb), 1.0), 0.0);
+    
+    return Color::new(r, g, b, 1.0);
+}
+
+fn color_from_wv(vector: &DVector<f32>, w_scale: f32) -> Color {
     if vector.len() < 4 {
         return WHITE;
     }
     
-    let positive_w_component = f32::clamp(vector[3] * w_scale, 0.0, 1.0);
-    let negative_w_component = f32::clamp(-vector[3] * w_scale, 0.0, 1.0);
-    
-    if vector[3] > 0.0 {
-        return Color::new(1.0, f32::lerp(1.0, 0.5, positive_w_component), f32::lerp(1.0, 0.0, positive_w_component), 1.0 - positive_w_component);
-    } else {
-        return Color::new(f32::lerp(1.0, 0.0, negative_w_component), f32::lerp(1.0, 0.5, negative_w_component), 1.0, 1.0 - negative_w_component);
-    }
-}
+    if vector.len() == 4 {
+        let positive_w_component = f32::clamp(vector[3] * w_scale, 0.0, 1.0);
+        let negative_w_component = f32::clamp(-vector[3] * w_scale, 0.0, 1.0);
 
-fn distance_from_volume(vertex: &DVector<f32>) -> f32 {
-    let mut distance: f32 = 0.0;
-    for axis in 0..(vertex.len() - 3) {
-        distance += vertex[axis + 3] * vertex[axis + 3];
+        if vector[3] > 0.0 {
+            return Color::new(1.0, f32::lerp(1.0, 0.5, positive_w_component), f32::lerp(1.0, 0.0, positive_w_component), 1.0 - positive_w_component);
+        } else {
+            return Color::new(f32::lerp(1.0, 0.0, negative_w_component), f32::lerp(1.0, 0.5, negative_w_component), 1.0, 1.0 - negative_w_component);
+        }
     }
     
-    f32::sqrt(distance)
+    let wv_vector = Vec2::new(vector[3], vector[4]);
+    
+    let fade_to_color = color_from_hue((wv_vector.to_angle() / TAU) + 0.5 + (1.0 / 12.0));
+    let fade_strength = f32::min(wv_vector.length() * w_scale, 1.0);
+    
+    return Color::new(
+        f32::lerp(1.0, fade_to_color.r, fade_strength),
+        f32::lerp(1.0, fade_to_color.g, fade_strength),
+        f32::lerp(1.0, fade_to_color.b, fade_strength),
+        1.0 - fade_strength
+    );
 }
 
-fn distance_from_4volume(vertex: &DVector<f32>) -> f32 {
-    if vertex.len() < 4 {
+fn distance_from_nvolume(vertex: &DVector<f32>, n: usize) -> f32 {
+    if vertex.len() < n {
         return 0.0;
     }
     
     let mut distance: f32 = 0.0;
-    for axis in 0..(vertex.len() - 4) {
-        distance += vertex[axis + 4] * vertex[axis + 4];
+    for axis in 0..(vertex.len() - n) {
+        distance += vertex[axis + n] * vertex[axis + n];
     }
     
     f32::sqrt(distance)
@@ -270,10 +286,10 @@ fn render(vertices: &Vec<DVector<f32>>, edges: &Vec<usize>, subdivisions: i32, s
             
             let edge_center = vertex_a.lerp(&vertex_b, (s as f32) / ((subdivisions - 1) as f32));
             
-            let mut color = if shape_matrix.ncols() < 4 {WHITE} else {color_from_w(&edge_center, w_scale)};
+            let mut color = if shape_matrix.ncols() < 4 {WHITE} else {color_from_wv(&edge_center, w_scale)};
             // let mut color = color_from_off_axis(&edge_center, w_scale, dimension);
             color.a *= fade_from_depth(edge_center[2], near, far, zoom);
-            color.a *= 1.0 - (distance_from_4volume(&edge_center) * w_scale).clamp(0.0, 1.0);
+            color.a *= 1.0 - (distance_from_nvolume(&edge_center, 5) * w_scale).clamp(0.0, 1.0);
             
             draw_variable_width_line(project_vertex(&vertex_1, render_size, screen_size), project_vertex(&vertex_2, render_size, screen_size), radius_1 * render_size, radius_2 * render_size, color);
         }
@@ -283,11 +299,11 @@ fn render(vertices: &Vec<DVector<f32>>, edges: &Vec<usize>, subdivisions: i32, s
     for i in 0..local_space_vertices.len() {
         let coord = project_vertex(&local_space_vertices[i], render_size, screen_size);
         
-        let mut color = color_from_w(&local_space_vertices[i], w_scale);
+        let mut color = color_from_wv(&local_space_vertices[i], w_scale);
         // let mut color = color_from_off_axis(&local_space_vertices[i], w_scale, dimension);
         
         color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
-        color.a *= 1.0 - (distance_from_4volume(&local_space_vertices[i]) * w_scale).clamp(0.0, 1.0);
+        color.a *= 1.0 - (distance_from_nvolume(&local_space_vertices[i], 5) * w_scale).clamp(0.0, 1.0);
         
         draw_circle(coord.x, coord.y, (screen_size.y * edge_width * render_size) / local_space_vertices[i][2], color);
     }
@@ -300,7 +316,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./3 op icosahedron.off".to_string(), &mut vertices, &mut edges, &mut dimension);
+    load_polytope("./7 op 5-orthoplex.off".to_string(), &mut vertices, &mut edges, &mut dimension);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
