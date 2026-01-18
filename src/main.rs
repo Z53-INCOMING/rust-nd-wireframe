@@ -316,7 +316,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./octelte alpha.off".to_string(), &mut vertices, &mut edges, &mut dimension);
+    load_polytope("./hexelte.off".to_string(), &mut vertices, &mut edges, &mut dimension);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
@@ -335,7 +335,7 @@ async fn main() {
     let mut subdivisions = 6;
     
     let mut image_index = -2;
-    let frame_count = 120;
+    let frame_count = 240;
     
     set_window_size(1024, 1024);
 
@@ -411,10 +411,11 @@ async fn main() {
         render(&vertices, &edges, subdivisions, &shape_matrix, &shape_position, edge_width, near, far, zoom, w_scale, render_size);
         
         if image_index > -1 { // During the loop
-            shape_matrix = rotate_matrix(0, 4, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
-            shape_matrix = rotate_matrix(1, 5, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
-            shape_matrix = rotate_matrix(2, 6, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
-            // shape_matrix = rotate_matrix(1, 3, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
+            shape_matrix = rotate_matrix(2, 0, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
+            shape_matrix = rotate_matrix(1, 3, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
+            // shape_matrix = rotate_matrix(5, 6, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
+            // shape_matrix = rotate_matrix(2, 7, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
+            // shape_position[3] += 4.0 / (frame_count as f32);
             
             get_screen_data().export_png(&format!("./images/{:03}.png", image_index));
             
@@ -428,11 +429,13 @@ async fn main() {
             set_default_camera();
             image_index = -2;
             set_window_size(1024, 1024);
+            shape_position[3] = 0.0;
         }
         
-        if is_key_pressed(KeyCode::Enter) {
+        if is_key_pressed(KeyCode::Enter) { // Start
             image_index = -1;
-            set_window_size(480, 480);
+            // set_window_size(1440, 1440);
+            // shape_position[3] = -2.0;
         }
         
         // println!("{}", shape_position[2]);
