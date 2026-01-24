@@ -1,4 +1,6 @@
 use gif::{Frame, Encoder, Repeat};
+use macroquad::audio::load_sound;
+use macroquad::audio::play_sound_once;
 use macroquad::miniquad::window::set_window_size;
 use macroquad::prelude::*;
 use macroquad::rand::rand;
@@ -21,7 +23,7 @@ fn rotate_matrix(axis_1: usize, axis_2: usize, angle_in_radians: f32, dimension:
     return matrix;
 }
 
-fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>, dimension: &mut usize) {
+fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>, dimension: &mut usize, min_dimension: usize) {
     if !std::path::Path::new(&path).exists() {
         return
     }
@@ -55,8 +57,8 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
         
         if line.ends_with("OFF") {
             *dimension = line[.. line.len() - 3].parse().unwrap();
-            if *dimension < 4 {
-                *dimension = 4;
+            if *dimension < min_dimension {
+                *dimension = min_dimension;
             }
             state = 1;
             continue;
@@ -74,7 +76,7 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
                 }
             }
             
-            while vertex.len() < 4 {
+            while vertex.len() < min_dimension {
                 vertex.push(0.0);
             }
             
@@ -316,7 +318,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./hexelte.off".to_string(), &mut vertices, &mut edges, &mut dimension);
+    load_polytope("./perpendicular squares.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
@@ -336,6 +338,8 @@ async fn main() {
     
     let mut image_index = -2;
     let frame_count = 240;
+    
+    let done_sound = load_sound("done.wav").await.unwrap();
     
     set_window_size(1024, 1024);
 
@@ -408,14 +412,12 @@ async fn main() {
             subdivisions -= 1;
         }
         
+        shape_matrix = &shape_matrix * rotate_matrix(0, 1, (TAU / 165.0) * 0.2, shape_matrix.ncols());
         render(&vertices, &edges, subdivisions, &shape_matrix, &shape_position, edge_width, near, far, zoom, w_scale, render_size);
         
         if image_index > -1 { // During the loop
-            shape_matrix = rotate_matrix(2, 0, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
-            shape_matrix = rotate_matrix(1, 3, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
-            // shape_matrix = rotate_matrix(5, 6, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
-            // shape_matrix = rotate_matrix(2, 7, TAU / (frame_count as f32), shape_matrix.ncols()) * shape_matrix;
-            // shape_position[3] += 4.0 / (frame_count as f32);
+            // shape_matrix = &shape_matrix * rotate_matrix(3, 4, TAU / (frame_count as f32), shape_matrix.ncols());
+            // shape_position[0] += 48.0 / (frame_count as f32);
             
             get_screen_data().export_png(&format!("./images/{:03}.png", image_index));
             
@@ -429,13 +431,15 @@ async fn main() {
             set_default_camera();
             image_index = -2;
             set_window_size(1024, 1024);
-            shape_position[3] = 0.0;
+            shape_position[0] = 0.0;
+            
+            play_sound_once(&done_sound);
         }
         
         if is_key_pressed(KeyCode::Enter) { // Start
             image_index = -1;
-            // set_window_size(1440, 1440);
-            // shape_position[3] = -2.0;
+            // set_window_size(360, 360);
+            // shape_position[4] = -2.0;
         }
         
         // println!("{}", shape_position[2]);
