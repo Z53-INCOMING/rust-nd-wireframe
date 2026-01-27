@@ -318,7 +318,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./perpendicular squares.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4);
+    load_polytope("./../Polychora/Archimedeans/11 op 8-cell.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
@@ -334,7 +334,7 @@ async fn main() {
     
     let mut previous_mouse_pos = Vector2::new(0.0, 0.0);
     
-    let mut subdivisions = 6;
+    let mut subdivisions = 1;
     
     let mut image_index = -2;
     let frame_count = 240;
@@ -370,19 +370,21 @@ async fn main() {
         let scroll = mouse_wheel().1;
         if scroll < 0.0 {
             if is_key_down(KeyCode::LeftControl) {
-                render_size *= 12.0/13.0;
+                zoom *= 13.0/12.0;
+                render_size *= 13.0/12.0;
             } else if is_key_down(KeyCode::LeftShift) {
                 edge_width *= 12.0/13.0;
             } else {
-                zoom *= 13.0/12.0;
+                render_size *= 12.0/13.0;
             }
         } else if scroll > 0.0 {
             if is_key_down(KeyCode::LeftControl) {
-                render_size *= 13.0/12.0;
+                zoom *= 12.0/13.0;
+                render_size *= 12.0/13.0;
             } else if is_key_down(KeyCode::LeftShift) {
                 edge_width *= 13.0/12.0;
             } else {
-                zoom *= 12.0/13.0;
+                render_size *= 13.0/12.0;
             }
         }
         shape_position[2] = zoom;
@@ -412,11 +414,12 @@ async fn main() {
             subdivisions -= 1;
         }
         
-        shape_matrix = &shape_matrix * rotate_matrix(0, 1, (TAU / 165.0) * 0.2, shape_matrix.ncols());
         render(&vertices, &edges, subdivisions, &shape_matrix, &shape_position, edge_width, near, far, zoom, w_scale, render_size);
         
         if image_index > -1 { // During the loop
-            // shape_matrix = &shape_matrix * rotate_matrix(3, 4, TAU / (frame_count as f32), shape_matrix.ncols());
+            shape_matrix = rotate_matrix(3, 4, TAU / (frame_count as f32), shape_matrix.ncols()) * &shape_matrix;
+            shape_matrix = rotate_matrix(0, 2, TAU / (frame_count as f32), shape_matrix.ncols()) * &shape_matrix;
+            shape_matrix = rotate_matrix(1, 5, TAU / (frame_count as f32), shape_matrix.ncols()) * &shape_matrix;
             // shape_position[0] += 48.0 / (frame_count as f32);
             
             get_screen_data().export_png(&format!("./images/{:03}.png", image_index));
@@ -438,7 +441,7 @@ async fn main() {
         
         if is_key_pressed(KeyCode::Enter) { // Start
             image_index = -1;
-            // set_window_size(360, 360);
+            set_window_size(360, 360);
             // shape_position[4] = -2.0;
         }
         
