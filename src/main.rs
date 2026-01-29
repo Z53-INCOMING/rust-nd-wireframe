@@ -23,7 +23,7 @@ fn rotate_matrix(axis_1: usize, axis_2: usize, angle_in_radians: f32, dimension:
     return matrix;
 }
 
-fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>, dimension: &mut usize, min_dimension: usize) {
+fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>, dimension: &mut usize, min_dimension: usize, expand_facets: bool) {
     if !std::path::Path::new(&path).exists() {
         return
     }
@@ -50,13 +50,23 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
             } else if state == 2 { // If done reading vertices, start reading edges (faces)
                 state = 3;
                 continue;
-            } else if state == 3 { // If done reading edges (faces), stop
-                break;
+            } else if state == 3 { // If done reading edges (faces), continue or stop depending on expand_facets
+                if expand_facets {
+                    break;
+                } else {
+                    state += 1;
+                }
             }
         }
         
         if line.ends_with("OFF") {
-            *dimension = line[.. line.len() - 3].parse().unwrap();
+            if line == "OFF" {
+                *dimension = 3; // some dumbasses think that not having a number for 3D is okay, well, it's NOT,
+                // it means I have to take time out of MY day to add an edge case for it every single time I
+                // make an OFF importer. AGH.
+            } else {
+                *dimension = line[.. line.len() - 3].parse().unwrap();
+            }
             if *dimension < min_dimension {
                 *dimension = min_dimension;
             }
@@ -318,7 +328,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./../Polychora/Archimedeans/11 op 8-cell.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4);
+    load_polytope("./hexelte.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4, true);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
@@ -417,10 +427,8 @@ async fn main() {
         render(&vertices, &edges, subdivisions, &shape_matrix, &shape_position, edge_width, near, far, zoom, w_scale, render_size);
         
         if image_index > -1 { // During the loop
-            shape_matrix = rotate_matrix(3, 4, TAU / (frame_count as f32), shape_matrix.ncols()) * &shape_matrix;
             shape_matrix = rotate_matrix(0, 2, TAU / (frame_count as f32), shape_matrix.ncols()) * &shape_matrix;
-            shape_matrix = rotate_matrix(1, 5, TAU / (frame_count as f32), shape_matrix.ncols()) * &shape_matrix;
-            // shape_position[0] += 48.0 / (frame_count as f32);
+            // shape_position[5] += 2.0 / (frame_count as f32);
             
             get_screen_data().export_png(&format!("./images/{:03}.png", image_index));
             
@@ -441,8 +449,8 @@ async fn main() {
         
         if is_key_pressed(KeyCode::Enter) { // Start
             image_index = -1;
-            set_window_size(360, 360);
-            // shape_position[4] = -2.0;
+            // set_window_size(256, 256);
+            // shape_position[5] = -1.0;
         }
         
         // println!("{}", shape_position[2]);
