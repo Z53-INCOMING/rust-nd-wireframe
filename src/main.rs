@@ -1,15 +1,11 @@
-use gif::{Frame, Encoder, Repeat};
 use macroquad::audio::load_sound;
 use macroquad::audio::play_sound_once;
 use macroquad::miniquad::window::set_window_size;
 use macroquad::prelude::*;
-use macroquad::rand::rand;
 use na::Vector2;
 use nalgebra::{self as na, DMatrix, DVector};
 use std;
 use std::f32::consts::TAU;
-use std::fs::File;
-use std::fs::read_to_string;
 
 fn rotate_matrix(axis_1: usize, axis_2: usize, angle_in_radians: f32, dimension: usize) -> DMatrix<f32> {
     let mut matrix = DMatrix::identity(dimension, dimension);
@@ -32,7 +28,14 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
     
     let mut state: u8 = 0;
     
+    let mut rank: u8 = 0;
+    
     let mut full_lines_seen = 0;
+    
+    // vertices
+    let mut polytope_vertices: Vec<DVector<f32>> = vec![];
+    // rank, element, indices referencing previous rank
+    let mut polytope_data: Vec<Vec<Vec<usize>>> = vec![];
     
     for line in contents.lines() {
         if line.starts_with("#") {
@@ -43,20 +46,24 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
             if state == 1 { // If done reading rank, start reading vertices
                 if full_lines_seen == 1 {
                     state = 2;
-                    continue;
-                } else {
-                    continue;
                 }
             } else if state == 2 { // If done reading vertices, start reading edges (faces)
                 state = 3;
-                continue;
-            } else if state == 3 { // If done reading edges (faces), continue or stop depending on expand_facets
-                if expand_facets {
+                polytope_data.push(vec![]);
+            } else if state > 2 { // If done reading edges (faces), continue or stop depending on expand_facets
+                if !expand_facets {
                     break;
                 } else {
                     state += 1;
+                    if state > rank {
+                        break;
+                    } else {
+                        polytope_data.push(vec![]);
+                    }
                 }
             }
+            
+            continue;
         }
         
         if line.ends_with("OFF") {
@@ -67,9 +74,13 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
             } else {
                 *dimension = line[.. line.len() - 3].parse().unwrap();
             }
+            
+            rank = *dimension as u8;
+            
             if *dimension < min_dimension {
                 *dimension = min_dimension;
             }
+            
             state = 1;
             continue;
         }
@@ -90,7 +101,7 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
                 vertex.push(0.0);
             }
             
-            vertices.push(DVector::from_vec(vertex));
+            polytope_vertices.push(DVector::from_vec(vertex));
         }
         
         // Edges (actually faces)
@@ -111,30 +122,65 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
                 index += 1;
             }
             
-            // loop through the face to get all the edges
-            for index in 0..face.len() {
-                let vertex_index_a = face[index];
-                let vertex_index_b = face[(index + 1) % face.len()];
-                
-                // make sure the edge or its opposite aren't in the edges array
-                let mut found_duplicate = false;
-                for edge_start_index in (0..edges.len()).step_by(2) {
-                    let edge_start = edges[edge_start_index];
-                    let edge_end = edges[edge_start_index + 1];
+            polytope_data[0].push(face.clone());
+            
+            if !expand_facets {
+                // loop through the face to get all the edges
+                for index in 0..face.len() {
+                    let vertex_index_a = face[index];
+                    let vertex_index_b = face[(index + 1) % face.len()];
                     
-                    if (vertex_index_a == edge_start && vertex_index_b == edge_end) || (vertex_index_a == edge_end && vertex_index_b == edge_start) {
-                        found_duplicate = true;
-                        break;
+                    // make sure the edge or its opposite aren't in the edges array
+                    let mut found_duplicate = false;
+                    for edge_start_index in (0..edges.len()).step_by(2) {
+                        let edge_start = edges[edge_start_index];
+                        let edge_end = edges[edge_start_index + 1];
+                        
+                        if (vertex_index_a == edge_start && vertex_index_b == edge_end) || (vertex_index_a == edge_end && vertex_index_b == edge_start) {
+                            found_duplicate = true;
+                            break;
+                        }
                     }
-                }
-                
-                // add them
-                if !found_duplicate {
-                    edges.push(vertex_index_a);
-                    edges.push(vertex_index_b);
+                    
+                    // add them
+                    if !found_duplicate {
+                        edges.push(vertex_index_a);
+                        edges.push(vertex_index_b);
+                    }
                 }
             }
         }
+        
+        if state > 3 {
+            // stores the rank n-1 element indices of the rank n element
+            let mut element: Vec<usize> = vec![];
+            
+            // go through the line of text to find the indices
+            let mut index = 0;
+            for number_string in line.split(" ") {
+                let number: usize = number_string.parse().unwrap();
+                
+                // the first one is the size of the element. who needs that? I have .len() and I'm not afraid to use it.
+                if index != 0 {
+                    element.push(number);
+                }
+                
+                index += 1;
+            }
+            
+            polytope_data[(state - 3) as usize].push(element);
+        }
+    }
+    
+    // we now have the polytope_data.
+    if expand_facets {
+        
+        // okay, we need to append vertices of every facet, scaled inward towards the average, to the polytope.
+        // then we need to add in the edges, looking at what connects to what and figuring out the new indices.
+        // that will be the hardest step and I'm not sure how to figure it out.
+        
+    } else {
+        *vertices = polytope_vertices.clone();
     }
 }
 
@@ -228,43 +274,6 @@ fn distance_from_nvolume(vertex: &DVector<f32>, n: usize) -> f32 {
     f32::sqrt(distance)
 }
 
-fn color_from_off_axis(vertex: &DVector<f32>, w_scale: f32, dimension: usize) -> Color {
-    if dimension < 4 {
-        return WHITE;
-    }
-    
-    let mut color = Color { r: 0.5, g: 0.5, b: 0.5, a: 1.0 };
-    
-    let mut distance: f32 = 0.0;
-    let mut off_axis: Vec<f32> = vec![];
-    for axis in 0..(dimension - 3) {
-        distance += vertex[axis + 3] * vertex[axis + 3];
-        off_axis.push(vertex[axis + 3]);
-    }
-    distance = f32::sqrt(distance);
-    
-    for axis in 0..(dimension - 3) {
-        off_axis[axis] /= distance * 2.0;
-        off_axis[axis] *= w_scale;
-        off_axis[axis] += 0.5;
-    }
-    
-    if dimension > 3 {
-        color.r = off_axis[0];
-    }
-    if dimension > 4 {
-        color.g = off_axis[1];
-    }
-    if dimension > 5 {
-        color.b = off_axis[2];
-    }
-    // if dimension > 6 {
-    //     color.a *= off_axis[3];
-    // }
-    
-    color
-}
-
 fn fade_from_depth(z: f32, near: f32, far: f32, zoom: f32) -> f32 {
     1.0 - clamp(f32::inverse_lerp(near + zoom, far + zoom, z), 0.0, 1.0)
 }
@@ -293,8 +302,8 @@ fn render(vertices: &Vec<DVector<f32>>, edges: &Vec<usize>, subdivisions: i32, s
             let vertex_1 = vertex_a.lerp(&vertex_b, (s as f32) / (subdivisions as f32));
             let vertex_2 = vertex_a.lerp(&vertex_b, ((s + 1) as f32) / (subdivisions as f32));
             
-            let radius_1 = ((screen_size.y * edge_width) / vertex_1[2]);
-            let radius_2 = ((screen_size.y * edge_width) / vertex_2[2]);
+            let radius_1 = (screen_size.y * edge_width) / vertex_1[2];
+            let radius_2 = (screen_size.y * edge_width) / vertex_2[2];
             
             let edge_center = (&vertex_1 + &vertex_2) / 2.0;
             
@@ -328,7 +337,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./hexelte.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4, true);
+    load_polytope("./5-cell.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4, true);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
