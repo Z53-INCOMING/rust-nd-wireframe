@@ -19,6 +19,13 @@ fn rotate_matrix(axis_1: usize, axis_2: usize, angle_in_radians: f32, dimension:
     return matrix;
 }
 
+fn get_vertices_from_element(polytope_data: &Vec<Vec<Vec<usize>>>, element_vertices: &mut Vec<DVector<f32>>, rank: usize, index: usize) {
+    // loop through the facet
+    // for every element, do the same thing (needs a recursive function)
+    // eventually you get down to vertices, at which point you loop over the facet_vertices array for duplicates
+    // if there isn't a duplicate, add it.
+}
+
 fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>, dimension: &mut usize, min_dimension: usize, expand_facets: bool) {
     if !std::path::Path::new(&path).exists() {
         return
@@ -176,6 +183,16 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
     if expand_facets {
         
         // okay, we need to append vertices of every facet, scaled inward towards the average, to the polytope.
+        for facet in 0..polytope_data[polytope_data.len() - 1].len() {
+            let mut facet_vertices: Vec<DVector<f32>> = vec![];
+            
+            get_vertices_from_element(&polytope_data, &mut facet_vertices, (rank - 1) as usize, facet);
+            
+            // once that is done, loop over all the facet_vertices to determine the center.
+            // loop over them again, subtracting each one by the center, multiplying by 0.9 or something, and then adding the center
+            // append those to the vertices array.
+        }
+        
         // then we need to add in the edges, looking at what connects to what and figuring out the new indices.
         // that will be the hardest step and I'm not sure how to figure it out.
         
