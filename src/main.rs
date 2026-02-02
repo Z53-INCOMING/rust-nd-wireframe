@@ -20,15 +20,24 @@ fn rotate_matrix(axis_1: usize, axis_2: usize, angle_in_radians: f32, dimension:
     return matrix;
 }
 
-fn get_vertices_from_element(polytope_data: &Vec<Vec<Vec<usize>>>, element_vertices: &mut Vec<usize>, rank: usize, index: usize) {
+fn get_vertices_from_element(polytope_data: &Vec<Vec<Vec<usize>>>, element_vertices: &mut Vec<usize>, element_edges: &mut Vec<usize>, rank: usize, index: usize) {
     // loop through the facet
+    let mut i = 0;
     for sub_element in &polytope_data[rank - 2][index] {
         if rank == 2 { // Faces, add vertices
             element_vertices.push(*sub_element);
+            
+            // Add the edge, which will be a pair of two integers, each pointing to a vertex ID in the global polytope.
+            element_edges.push(*sub_element);
+            
+            // Get the next vertex ID ID, and append it. Remember that polygons are circular.
+            let next_vertex_id_id = (i + 1) % polytope_data[rank - 2][index].len();
+            element_edges.push(polytope_data[rank - 2][index][next_vertex_id_id]);
         } else { // Non faces, check sub elements
             let mut sub_vertices: Vec<usize> = vec![];
+            let mut sub_edges: Vec<usize> = vec![];
             
-            get_vertices_from_element(polytope_data, &mut sub_vertices, rank - 1, *sub_element);
+            get_vertices_from_element(polytope_data, &mut sub_vertices, &mut sub_edges, rank - 1, *sub_element);
             
             // Merge faces and other elements correctly
             for vertex in sub_vertices.iter() {
@@ -36,11 +45,33 @@ fn get_vertices_from_element(polytope_data: &Vec<Vec<Vec<usize>>>, element_verti
                     element_vertices.push(vertex.clone());
                 }
             }
+            for edge in (0..sub_edges.len()).step_by(2) {
+                let mut vertex_index_a = sub_edges[edge];
+                let mut vertex_index_b = sub_edges[edge + 1];
+                
+                let mut found_duplicate = false;
+                for edge_start_index in (0..element_edges.len()).step_by(2) {
+                    let edge_start = element_edges[edge_start_index];
+                    let edge_end = element_edges[edge_start_index + 1];
+                    
+                    if (vertex_index_a == edge_start && vertex_index_b == edge_end) || (vertex_index_a == edge_end && vertex_index_b == edge_start) {
+                        found_duplicate = true;
+                        break;
+                    }
+                }
+                
+                if !found_duplicate {
+                    element_edges.push(vertex_index_a);
+                    element_edges.push(vertex_index_b);
+                }
+            }
         }
+        
+        i += 1;
     }
 }
 
-fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>, dimension: &mut usize, min_dimension: usize, expand_facets: bool) {
+fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>, dimension: &mut usize, min_dimension: usize, facet_expansion: f32) {
     if !std::path::Path::new(&path).exists() {
         return
     }
@@ -71,8 +102,8 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
             } else if state == 2 { // If done reading vertices, start reading edges (faces)
                 state = 3;
                 polytope_data.push(vec![]);
-            } else if state > 2 { // If done reading edges (faces), continue or stop depending on expand_facets
-                if !expand_facets {
+            } else if state > 2 { // If done reading edges (faces), continue or stop depending on facet_expansion
+                if facet_expansion == 0.0 {
                     break;
                 } else {
                     state += 1;
@@ -145,7 +176,7 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
             
             polytope_data[0].push(face.clone());
             
-            if !expand_facets {
+            if facet_expansion == 0.0 {
                 // loop through the face to get all the edges
                 for index in 0..face.len() {
                     let vertex_index_a = face[index];
@@ -194,13 +225,14 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
     }
     
     // we now have the polytope_data.
-    if expand_facets {
+    if facet_expansion > 0.0 {
         
         // okay, we need to append vertices of every facet, scaled inward towards the average, to the polytope.
         for facet in 0..polytope_data[polytope_data.len() - 1].len() {
             let mut facet_vertices: Vec<usize> = vec![];
+            let mut facet_edges: Vec<usize> = vec![];
             
-            get_vertices_from_element(&polytope_data, &mut facet_vertices, (rank - 1) as usize, facet);
+            get_vertices_from_element(&polytope_data, &mut facet_vertices, &mut facet_edges, (rank - 1) as usize, facet);
             
             // once that is done, loop over all the facet_vertices to determine the center.
             let mut facet_center: DVector<f32> = DVector::zeros(*dimension);
@@ -209,15 +241,29 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
             }
             facet_center /= facet_vertices.len() as f32;
             
-            // loop over them again, subtracting each one by the center, multiplying by 0.9 or something, and then adding the center
+            // vertices is the vertices of the mesh
+            // polytope_vertices is the vertices of the polytope
+            // fucking dumbass (for context, this used to say polytope_vertices.len(), and I struggled to find why it wasn't working)
+            let past_vertex_count = vertices.len();
+            
+            // loop over them again, subtracting each one by the center, multiplying by facet_expansion, and then adding the center
             for vertex in facet_vertices.iter() {
-                vertices.push(((&polytope_vertices[*vertex] - &facet_center) * 0.75) + &facet_center);
+                vertices.push(((&polytope_vertices[*vertex] - &facet_center) * facet_expansion) + &facet_center);
+            }
+            
+            for edge in facet_edges.iter() {
+                // These variables are very poorly named, so I will explain
+                // past_vertex_count is the number of vertices before a facet, so that's our starting point
+                // we have edges as references to vertex IDs in the global polytope
+                // but we want the edges as reference to vertex IDs in the facet
+                // luckily we can just search the facet_vertices array for these IDs and then it'll work
+                
+                // edge is the global polytope vertex ID to the first or second half of an edge
+                // facet_vertices contains the vertex IDs of the facet in relation to the global polytope
+                
+                edges.push(past_vertex_count + facet_vertices.iter().position(|x| *x == *edge).unwrap());
             }
         }
-        
-        // then we need to add in the edges, looking at what connects to what and figuring out the new indices.
-        // that will be the hardest step and I'm not sure how to figure it out.
-        // number_of_vertices_in_polytope_before_facet + vertex_number_in_facet
         
     } else {
         *vertices = polytope_vertices.clone();
@@ -377,7 +423,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./8-cell.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4, true);
+    load_polytope("./hexelte.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4, 0.8);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
