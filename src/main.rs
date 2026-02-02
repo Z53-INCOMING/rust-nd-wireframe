@@ -6,6 +6,7 @@ use na::Vector2;
 use nalgebra::{self as na, DMatrix, DVector};
 use std;
 use std::f32::consts::TAU;
+use std::vec;
 
 fn rotate_matrix(axis_1: usize, axis_2: usize, angle_in_radians: f32, dimension: usize) -> DMatrix<f32> {
     let mut matrix = DMatrix::identity(dimension, dimension);
@@ -19,11 +20,24 @@ fn rotate_matrix(axis_1: usize, axis_2: usize, angle_in_radians: f32, dimension:
     return matrix;
 }
 
-fn get_vertices_from_element(polytope_data: &Vec<Vec<Vec<usize>>>, element_vertices: &mut Vec<DVector<f32>>, rank: usize, index: usize) {
+fn get_vertices_from_element(vertices: &Vec<DVector<f32>>, polytope_data: &Vec<Vec<Vec<usize>>>, element_vertices: &mut Vec<DVector<f32>>, rank: usize, index: usize) {
     // loop through the facet
-    // for every element, do the same thing (needs a recursive function)
-    // eventually you get down to vertices, at which point you loop over the facet_vertices array for duplicates
-    // if there isn't a duplicate, add it.
+    for sub_element in &polytope_data[rank - 2][index] {
+        if rank == 2 { // Faces, add vertices
+            element_vertices.push(vertices[*sub_element].clone());
+        } else { // Non faces, check sub elements
+            let mut sub_vertices: Vec<DVector<f32>> = vec![];
+            
+            get_vertices_from_element(vertices, polytope_data, &mut sub_vertices, rank - 1, *sub_element);
+            
+            // Merge faces and other elements correctly
+            for vertex in sub_vertices.iter() {
+                if !element_vertices.contains(vertex) {
+                    element_vertices.push(vertex.clone());
+                }
+            }
+        }
+    }
 }
 
 fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>, dimension: &mut usize, min_dimension: usize, expand_facets: bool) {
@@ -186,15 +200,24 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
         for facet in 0..polytope_data[polytope_data.len() - 1].len() {
             let mut facet_vertices: Vec<DVector<f32>> = vec![];
             
-            get_vertices_from_element(&polytope_data, &mut facet_vertices, (rank - 1) as usize, facet);
+            get_vertices_from_element(&polytope_vertices, &polytope_data, &mut facet_vertices, (rank - 1) as usize, facet);
             
             // once that is done, loop over all the facet_vertices to determine the center.
+            let mut facet_center: DVector<f32> = DVector::zeros(*dimension);
+            for vertex in facet_vertices.iter() {
+                facet_center += vertex;
+            }
+            facet_center /= facet_vertices.len() as f32;
+            
             // loop over them again, subtracting each one by the center, multiplying by 0.9 or something, and then adding the center
-            // append those to the vertices array.
+            for vertex in facet_vertices.iter() {
+                vertices.push(((vertex - &facet_center) * 0.75) + &facet_center);
+            }
         }
         
         // then we need to add in the edges, looking at what connects to what and figuring out the new indices.
         // that will be the hardest step and I'm not sure how to figure it out.
+        // number_of_vertices_in_polytope_before_facet + vertex_number_in_facet
         
     } else {
         *vertices = polytope_vertices.clone();
@@ -334,17 +357,17 @@ fn render(vertices: &Vec<DVector<f32>>, edges: &Vec<usize>, subdivisions: i32, s
         
     }
     
-    // for i in 0..local_space_vertices.len() {
-    //     let coord = project_vertex(&local_space_vertices[i], render_size, screen_size);
+    for i in 0..local_space_vertices.len() {
+        let coord = project_vertex(&local_space_vertices[i], render_size, screen_size);
         
-    //     let mut color = color_from_wv(&local_space_vertices[i], w_scale);
-    //     // let mut color = color_from_off_axis(&local_space_vertices[i], w_scale, dimension);
+        let mut color = color_from_wv(&local_space_vertices[i], w_scale);
+        // let mut color = color_from_off_axis(&local_space_vertices[i], w_scale, dimension);
         
-    //     color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
-    //     color.a *= 1.0 - (distance_from_nvolume(&local_space_vertices[i], 5) * w_scale).clamp(0.0, 1.0);
+        color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
+        color.a *= 1.0 - (distance_from_nvolume(&local_space_vertices[i], 5) * w_scale).clamp(0.0, 1.0);
         
-    //     draw_circle(coord.x, coord.y, (screen_size.y * edge_width * render_size) / local_space_vertices[i][2], color);
-    // }
+        draw_circle(coord.x, coord.y, (screen_size.y * edge_width * render_size) / local_space_vertices[i][2], color);
+    }
 }
 
 #[macroquad::main("nD Renderer")]
@@ -354,7 +377,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./5-cell.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4, true);
+    load_polytope("./8-cell.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4, true);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
