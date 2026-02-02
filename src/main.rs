@@ -20,15 +20,15 @@ fn rotate_matrix(axis_1: usize, axis_2: usize, angle_in_radians: f32, dimension:
     return matrix;
 }
 
-fn get_vertices_from_element(vertices: &Vec<DVector<f32>>, polytope_data: &Vec<Vec<Vec<usize>>>, element_vertices: &mut Vec<DVector<f32>>, rank: usize, index: usize) {
+fn get_vertices_from_element(polytope_data: &Vec<Vec<Vec<usize>>>, element_vertices: &mut Vec<usize>, rank: usize, index: usize) {
     // loop through the facet
     for sub_element in &polytope_data[rank - 2][index] {
         if rank == 2 { // Faces, add vertices
-            element_vertices.push(vertices[*sub_element].clone());
+            element_vertices.push(*sub_element);
         } else { // Non faces, check sub elements
-            let mut sub_vertices: Vec<DVector<f32>> = vec![];
+            let mut sub_vertices: Vec<usize> = vec![];
             
-            get_vertices_from_element(vertices, polytope_data, &mut sub_vertices, rank - 1, *sub_element);
+            get_vertices_from_element(polytope_data, &mut sub_vertices, rank - 1, *sub_element);
             
             // Merge faces and other elements correctly
             for vertex in sub_vertices.iter() {
@@ -198,20 +198,20 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
         
         // okay, we need to append vertices of every facet, scaled inward towards the average, to the polytope.
         for facet in 0..polytope_data[polytope_data.len() - 1].len() {
-            let mut facet_vertices: Vec<DVector<f32>> = vec![];
+            let mut facet_vertices: Vec<usize> = vec![];
             
-            get_vertices_from_element(&polytope_vertices, &polytope_data, &mut facet_vertices, (rank - 1) as usize, facet);
+            get_vertices_from_element(&polytope_data, &mut facet_vertices, (rank - 1) as usize, facet);
             
             // once that is done, loop over all the facet_vertices to determine the center.
             let mut facet_center: DVector<f32> = DVector::zeros(*dimension);
             for vertex in facet_vertices.iter() {
-                facet_center += vertex;
+                facet_center += &polytope_vertices[*vertex];
             }
             facet_center /= facet_vertices.len() as f32;
             
             // loop over them again, subtracting each one by the center, multiplying by 0.9 or something, and then adding the center
             for vertex in facet_vertices.iter() {
-                vertices.push(((vertex - &facet_center) * 0.75) + &facet_center);
+                vertices.push(((&polytope_vertices[*vertex] - &facet_center) * 0.75) + &facet_center);
             }
         }
         
