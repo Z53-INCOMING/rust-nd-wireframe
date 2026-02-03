@@ -450,6 +450,7 @@ async fn main() {
     
     let mut starting_position: Vec<f32> = vec![];
     let mut motion: Vec<f32> = vec![];
+    
     let done_sound = load_sound("done.wav").await.unwrap();
     
     set_window_size(1024, 1024);
@@ -463,6 +464,7 @@ async fn main() {
         if is_mouse_button_down(MouseButton::Left) || is_mouse_button_down(MouseButton::Middle) {
             if is_key_down(KeyCode::LeftControl) {
                 shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 3, -1.0/216.0);
+            } else if is_key_down(KeyCode::Z) {
                 shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 4, -1.0/216.0);
             } else if is_key_down(KeyCode::X) {
                 shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 5, -1.0/216.0);
