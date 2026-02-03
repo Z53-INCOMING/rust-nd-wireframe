@@ -1,10 +1,19 @@
 # A Beautiful N-Dimensional Polytope Wireframe Renderer With .OFF Support
 I have put a lot of time into this renderer, and love using it to make renders for my website and [YouTube channel](https://www.youtube.com/@tessimal256). I have gained lots of intuition about higher dimensional shapes by using it, and I hope that you find it similarly useful. You don't have to credit me for use, but it is appreciated, you can credit me as tessimal, @tessimal256 on YouTube, linking to my [website](https://fifty-third-dimension.neocities.org), or of course, linking to this repo page. Below is a video showcasing the renderer, pre facet expansion update.
 
-## Renderer Showcase, K_21 Polytopes
+[Renderer Showcase, k_21 Polytopes](https://youtu.be/LEB5aXmeuao)
 
-[![Video Thumbnail](https://img.youtube.com/vi/LEB5aXmeuao/0.jpg)](https://youtu.be/LEB5aXmeuao)
+## Feature List:
+- Variable line thickness, edges appear smaller as they get further from the camera
+- Supports schlegel diagram rendering, orthographic rendering, and everything in between
+- Optional fading out of the back half of a shape, to give an illision of solidity
+- Colored directional fading for edges not on the XYZ volume
+- Subdivided edges for smoother fading
+- Easy rotation and translation animation
+- Facet expansion, makes facets appear seperate from each other, especially helpful on high dimensional polytopes
+- Rendering goes up to infinite dimensions, controls go up to 10
 
+## Tutorial
 All of the text files mentioned in this usage tutorial can be found in ./src.
 
 <font color=red>Warning!!!</font> With default settings, this will crash since there are no .offs in the directory. I'd add one but it's a whole thing with the .gitignore and it doesn't matter that much and it's really easy to fix on your end.
