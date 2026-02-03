@@ -403,17 +403,18 @@ fn render(vertices: &Vec<DVector<f32>>, edges: &Vec<usize>, subdivisions: i32, s
         
     }
     
-    for i in 0..local_space_vertices.len() {
-        let coord = project_vertex(&local_space_vertices[i], render_size, screen_size);
+    // Render vertices
+    // for i in 0..local_space_vertices.len() {
+    //     let coord = project_vertex(&local_space_vertices[i], render_size, screen_size);
         
-        let mut color = color_from_wv(&local_space_vertices[i], w_scale);
-        // let mut color = color_from_off_axis(&local_space_vertices[i], w_scale, dimension);
+    //     let mut color = color_from_wv(&local_space_vertices[i], w_scale);
+    //     // let mut color = color_from_off_axis(&local_space_vertices[i], w_scale, dimension);
         
-        color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
-        color.a *= 1.0 - (distance_from_nvolume(&local_space_vertices[i], 5) * w_scale).clamp(0.0, 1.0);
+    //     color.a *= fade_from_depth(local_space_vertices[i][2], near, far, zoom);
+    //     color.a *= 1.0 - (distance_from_nvolume(&local_space_vertices[i], 5) * w_scale).clamp(0.0, 1.0);
         
-        draw_circle(coord.x, coord.y, (screen_size.y * edge_width * render_size) / local_space_vertices[i][2], color);
-    }
+    //     draw_circle(coord.x, coord.y, (screen_size.y * edge_width * render_size) / local_space_vertices[i][2], color);
+    // }
 }
 
 #[macroquad::main("nD Renderer")]
@@ -442,7 +443,7 @@ async fn main() {
     let mut subdivisions = 1;
     
     let mut image_index = -2;
-    let frame_count = 60;
+    let frame_count = 240;
     
     let mut rotations: Vec<usize> = vec![];
     let mut rotations_global_vs_local: Vec<bool> = vec![];
