@@ -419,12 +419,38 @@ fn render(vertices: &Vec<DVector<f32>>, edges: &Vec<usize>, subdivisions: i32, s
 
 #[macroquad::main("nD Renderer")]
 async fn main() {
+    if !std::path::Path::new("./src/setup.txt").exists() {
+        panic!("no setup.txt file!!!!");
+    }
+    
+    let setup_file_contents = std::fs::read_to_string("./src/setup.txt").unwrap();
+    
+    let mut path = "";
+    let mut facet_expansion = 0.0;
+    let mut resolution = 1024;
+    let mut frame_count = 240;
+    let mut min_dimension: usize = 4;
+    
+    let mut setup_index = 0;
+    for line in setup_file_contents.lines() {
+        match setup_index {
+            0 => path = line,
+            1 => resolution = line.parse().unwrap(),
+            2 => frame_count = line.parse().unwrap(),
+            3 => min_dimension = line.parse().unwrap(),
+            4 => facet_expansion = line.parse().unwrap(),
+            _ => error!("setup.txt too big")
+        }
+        
+        setup_index += 1;
+    }
+    
     let mut dimension = 0;
     
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./5-cell.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4, 0.0);
+    load_polytope(path.to_string(), &mut vertices, &mut edges, &mut dimension, min_dimension, facet_expansion);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
@@ -443,7 +469,6 @@ async fn main() {
     let mut subdivisions = 1;
     
     let mut image_index = -2;
-    let frame_count = 240;
     
     let mut rotations: Vec<usize> = vec![];
     let mut rotations_global_vs_local: Vec<bool> = vec![];

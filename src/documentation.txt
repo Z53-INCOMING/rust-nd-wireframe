@@ -10,8 +10,10 @@ motion.txt:
 
 setup.txt:
     first line is a path to the polytope you wish to load, local to this folder starting with "./".
-    second line is the resolution of the animation.
+    second line is the horizontal and vertical resolution of the animation in a single number, so all animations must be square.
     third line is the number of frames in the animation.
+    fourth line is the minimum dimension
+    fifth line is the facet expansion, 0.0 turns it off, 1.0 is visually identical, 0.5 - 0.9 is good.
 
 axes:
     0 - right
@@ -40,5 +42,7 @@ controls:
     W/S - move fade end forward and backward. everything after this point is invisible, everything behind it gets brighter and brighter until fade start
     E/D - expands/contracts the extra dimensional fade, aka it controls how far you see into what's perpendicular to XYZ
     R/F - controls the number of subdivisions of the edges
+    
+    0 - reloads setup.txt
     
     Enter - starts the animation, and starts writing frames to ./images. be warned- you can still do all the usual inputs while it's rendering, if you accidentally pan or something it will be visible in the animation.
