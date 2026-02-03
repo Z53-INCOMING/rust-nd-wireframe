@@ -46,8 +46,8 @@ fn get_vertices_from_element(polytope_data: &Vec<Vec<Vec<usize>>>, element_verti
                 }
             }
             for edge in (0..sub_edges.len()).step_by(2) {
-                let mut vertex_index_a = sub_edges[edge];
-                let mut vertex_index_b = sub_edges[edge + 1];
+                let vertex_index_a = sub_edges[edge];
+                let vertex_index_b = sub_edges[edge + 1];
                 
                 let mut found_duplicate = false;
                 for edge_start_index in (0..element_edges.len()).step_by(2) {
@@ -292,14 +292,14 @@ fn draw_variable_width_line(start_point: Vector2<f32>, end_point: Vector2<f32>, 
 
 fn mouse_control(previous_mouse_pos: Vector2<f32>, dimension: usize, shape_matrix: DMatrix<f32>, axis: usize, sensitivity: f32) -> DMatrix<f32> {
     if axis < dimension {
-        return rotate_matrix(1, axis, (previous_mouse_pos.y - mouse_position().1) * sensitivity, dimension) * rotate_matrix(0, axis, (previous_mouse_pos.x - mouse_position().0) * sensitivity, dimension) * shape_matrix;
+        return rotate_matrix(1, axis, (mouse_position().1 - previous_mouse_pos.y) * -sensitivity, dimension) * rotate_matrix(0, axis, (mouse_position().0 - previous_mouse_pos.x) * sensitivity, dimension) * shape_matrix;
     } else {
         return shape_matrix;
     }
 }
 
 fn project_vertex(vertex: &DVector<f32>, render_size: f32, screen_size: Vector2<f32>) -> Vector2<f32> {
-    let mut screen_vertex = Vector2::new(vertex[0], vertex[1]) / (vertex[2]);
+    let mut screen_vertex = Vector2::new(-vertex[0], vertex[1]) / (vertex[2]);
     screen_vertex *= -screen_height() * render_size;
     screen_vertex += screen_size / 2.0;
     
@@ -448,6 +448,8 @@ async fn main() {
     let mut rotations: Vec<usize> = vec![];
     let mut rotations_global_vs_local: Vec<bool> = vec![];
     
+    let mut starting_position: Vec<f32> = vec![];
+    let mut motion: Vec<f32> = vec![];
     let done_sound = load_sound("done.wav").await.unwrap();
     
     set_window_size(1024, 1024);
@@ -459,7 +461,8 @@ async fn main() {
         }
         
         if is_mouse_button_down(MouseButton::Left) || is_mouse_button_down(MouseButton::Middle) {
-            if is_key_down(KeyCode::Z) {
+            if is_key_down(KeyCode::LeftControl) {
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 3, -1.0/216.0);
                 shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 4, -1.0/216.0);
             } else if is_key_down(KeyCode::X) {
                 shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 5, -1.0/216.0);
@@ -467,8 +470,10 @@ async fn main() {
                 shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 6, -1.0/216.0);
             } else if is_key_down(KeyCode::V) {
                 shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 7, -1.0/216.0);
-            } else if is_key_down(KeyCode::LeftControl) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 3, -1.0/216.0);
+            } else if is_key_down(KeyCode::B) {
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 8, -1.0/216.0);
+            } else if is_key_down(KeyCode::N) {
+                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 9, -1.0/216.0);
             } else {
                 shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 2, 1.0/216.0);
             }
@@ -534,7 +539,11 @@ async fn main() {
                     shape_matrix = rotation_matrix * &shape_matrix;
                 }
             }
-            // shape_position[5] += 2.0 / (frame_count as f32);
+            for i in 0..motion.len() {
+                if i != 2 {
+                    shape_position[i] += motion[i] / (frame_count as f32);
+                }
+            }
             
             get_screen_data().export_png(&format!("./images/{:03}.png", image_index));
             
@@ -556,41 +565,67 @@ async fn main() {
         if is_key_pressed(KeyCode::Enter) { // Start
             image_index = -1;
             
-            if !std::path::Path::new("./rotations.txt").exists() {
+            if !std::path::Path::new("./src/rotations.txt").exists() {
                 panic!("no rotations.txt file!!!!");
             }
+            if !std::path::Path::new("./src/motion.txt").exists() {
+                panic!("no motion.txt file!!!!");
+            }
 
-            let contents = std::fs::read_to_string("./rotations.txt").unwrap();
+            let rotation_file_contents = std::fs::read_to_string("./src/rotations.txt").unwrap();
             
             rotations.clear();
             rotations_global_vs_local.clear();
             
-            let mut values: Vec<usize> = vec![];
+            let mut rotation_file_values: Vec<usize> = vec![];
             
-            for line in contents.lines() {
-                // go through the line of text to find the indices
-                let mut index = 0;
+            for line in rotation_file_contents.lines() {
+                // go through the line of text to find the numbers
                 for number_string in line.split(" ") {
                     let number: usize = number_string.parse().unwrap();
                     
-                    values.push(number);
-                    
-                    index += 1;
+                    rotation_file_values.push(number);
                 }
             }
             
-            for i in (0..values.len()).step_by(3) {
-                rotations.push(values[i]);
-                rotations.push(values[i + 1]);
+            for i in (0..rotation_file_values.len()).step_by(3) {
+                rotations.push(rotation_file_values[i]);
+                rotations.push(rotation_file_values[i + 1]);
                 
-                rotations_global_vs_local.push(values[i + 2] == 1);
+                rotations_global_vs_local.push(rotation_file_values[i + 2] == 1);
             }
             
+            let motion_file_contents = std::fs::read_to_string("./src/motion.txt").unwrap();
+            
+            starting_position.clear();
+            motion.clear();
+            
+            let mut index = 0;
+            for line in motion_file_contents.lines() {
+                // go through the line of text to find the numbers
+                for number_string in line.split(" ") {
+                    let number: f32 = number_string.parse().unwrap();
+                    
+                    if index == 0 {
+                        starting_position.push(number);
+                    } else if index == 1 {
+                        motion.push(number);
+                    }
+                }
+                
+                index += 1;
+            }
+            
+            for i in 0..starting_position.len() {
+                if i != 2 {
+                    shape_position[i] = starting_position[i];
+                }
+            }
+            
+            println!("{:?}", starting_position);
+            
             // set_window_size(256, 256);
-            // shape_position[5] = -1.0;
         }
-        
-        // println!("{}", shape_position[2]);
         
         next_frame().await
     }
