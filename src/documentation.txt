@@ -36,7 +36,8 @@ controls:
     N + pan - pan XQ YQ
     
     scroll wheel - make image larger or smaller
-    CTRL + scroll wheel - change perspective
+    Control + scroll wheel - change perspective
+    Shift + scroll wheel - change line thickness
     
     Q/A - move fade start forward and backward. everything behind this point doesn't lose any brightness, everything after it does until fade end
     W/S - move fade end forward and backward. everything after this point is invisible, everything behind it gets brighter and brighter until fade start

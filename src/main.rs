@@ -71,12 +71,12 @@ fn get_vertices_from_element(polytope_data: &Vec<Vec<Vec<usize>>>, element_verti
     }
 }
 
-fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec<usize>, dimension: &mut usize, min_dimension: usize, facet_expansion: f32) {
-    if !std::path::Path::new(&path).exists() {
+fn load_polytope(scene: &mut Scene) {
+    if !std::path::Path::new(scene.polytope_path.as_str()).exists() {
         return
     }
 
-    let contents = std::fs::read_to_string(path).unwrap();
+    let contents = std::fs::read_to_string(scene.polytope_path.as_str()).unwrap();
     
     let mut state: u8 = 0;
     
@@ -103,7 +103,7 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
                 state = 3;
                 polytope_data.push(vec![]);
             } else if state > 2 { // If done reading edges (faces), continue or stop depending on facet_expansion
-                if facet_expansion == 0.0 {
+                if scene.facet_expansion == 0.0 {
                     break;
                 } else {
                     state += 1;
@@ -120,17 +120,17 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
         
         if line.ends_with("OFF") {
             if line == "OFF" {
-                *dimension = 3; // some dumbasses think that not having a number for 3D is okay, well, it's NOT,
+                scene.dimension = 3; // some dumbasses think that not having a number for 3D is okay, well, it's NOT,
                 // it means I have to take time out of MY day to add an edge case for it every single time I
                 // make an OFF importer. AGH.
             } else {
-                *dimension = line[.. line.len() - 3].parse().unwrap();
+                scene.dimension = line[.. line.len() - 3].parse().unwrap();
             }
             
-            rank = *dimension as u8;
+            rank = scene.dimension as u8;
             
-            if *dimension < min_dimension {
-                *dimension = min_dimension;
+            if scene.dimension < scene.min_dimension {
+                scene.dimension = scene.min_dimension;
             }
             
             state = 1;
@@ -149,7 +149,7 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
                 }
             }
             
-            while vertex.len() < min_dimension {
+            while vertex.len() < scene.min_dimension {
                 vertex.push(0.0);
             }
             
@@ -176,7 +176,7 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
             
             polytope_data[0].push(face.clone());
             
-            if facet_expansion == 0.0 {
+            if scene.facet_expansion == 0.0 {
                 // loop through the face to get all the edges
                 for index in 0..face.len() {
                     let vertex_index_a = face[index];
@@ -184,9 +184,9 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
                     
                     // make sure the edge or its opposite aren't in the edges array
                     let mut found_duplicate = false;
-                    for edge_start_index in (0..edges.len()).step_by(2) {
-                        let edge_start = edges[edge_start_index];
-                        let edge_end = edges[edge_start_index + 1];
+                    for edge_start_index in (0..scene.edges.len()).step_by(2) {
+                        let edge_start = scene.edges[edge_start_index];
+                        let edge_end = scene.edges[edge_start_index + 1];
                         
                         if (vertex_index_a == edge_start && vertex_index_b == edge_end) || (vertex_index_a == edge_end && vertex_index_b == edge_start) {
                             found_duplicate = true;
@@ -196,8 +196,8 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
                     
                     // add them
                     if !found_duplicate {
-                        edges.push(vertex_index_a);
-                        edges.push(vertex_index_b);
+                        scene.edges.push(vertex_index_a);
+                        scene.edges.push(vertex_index_b);
                     }
                 }
             }
@@ -225,7 +225,7 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
     }
     
     // we now have the polytope_data.
-    if facet_expansion > 0.0 {
+    if scene.facet_expansion > 0.0 {
         
         // okay, we need to append vertices of every facet, scaled inward towards the average, to the polytope.
         for facet in 0..polytope_data[polytope_data.len() - 1].len() {
@@ -235,7 +235,7 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
             get_vertices_from_element(&polytope_data, &mut facet_vertices, &mut facet_edges, (rank - 1) as usize, facet);
             
             // once that is done, loop over all the facet_vertices to determine the center.
-            let mut facet_center: DVector<f32> = DVector::zeros(*dimension);
+            let mut facet_center: DVector<f32> = DVector::zeros(scene.dimension);
             for vertex in facet_vertices.iter() {
                 facet_center += &polytope_vertices[*vertex];
             }
@@ -244,11 +244,11 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
             // vertices is the vertices of the mesh
             // polytope_vertices is the vertices of the polytope
             // fucking dumbass (for context, this used to say polytope_vertices.len(), and I struggled to find why it wasn't working)
-            let past_vertex_count = vertices.len();
+            let past_vertex_count = scene.vertices.len();
             
             // loop over them again, subtracting each one by the center, multiplying by facet_expansion, and then adding the center
             for vertex in facet_vertices.iter() {
-                vertices.push(((&polytope_vertices[*vertex] - &facet_center) * facet_expansion) + &facet_center);
+                scene.vertices.push(((&polytope_vertices[*vertex] - &facet_center) * scene.facet_expansion) + &facet_center);
             }
             
             for edge in facet_edges.iter() {
@@ -261,12 +261,12 @@ fn load_polytope(path: String, vertices: &mut Vec<DVector<f32>>, edges: &mut Vec
                 // edge is the global polytope vertex ID to the first or second half of an edge
                 // facet_vertices contains the vertex IDs of the facet in relation to the global polytope
                 
-                edges.push(past_vertex_count + facet_vertices.iter().position(|x| *x == *edge).unwrap());
+                scene.edges.push(past_vertex_count + facet_vertices.iter().position(|x| *x == *edge).unwrap());
             }
         }
         
     } else {
-        *vertices = polytope_vertices.clone();
+        scene.vertices = polytope_vertices.clone();
     }
 }
 
@@ -417,43 +417,47 @@ fn render(vertices: &Vec<DVector<f32>>, edges: &Vec<usize>, subdivisions: i32, s
     // }
 }
 
-#[macroquad::main("nD Renderer")]
-async fn main() {
-    if !std::path::Path::new("./src/setup.txt").exists() {
-        panic!("no setup.txt file!!!!");
-    }
-    
-    let setup_file_contents = std::fs::read_to_string("./src/setup.txt").unwrap();
-    
-    let mut path = "";
-    let mut facet_expansion = 0.0;
-    let mut resolution = 1024;
-    let mut frame_count = 240;
-    let mut min_dimension: usize = 4;
-    
-    let mut setup_index = 0;
-    for line in setup_file_contents.lines() {
-        match setup_index {
-            0 => path = line,
-            1 => resolution = line.parse().unwrap(),
-            2 => frame_count = line.parse().unwrap(),
-            3 => min_dimension = line.parse().unwrap(),
-            4 => facet_expansion = line.parse().unwrap(),
-            _ => error!("setup.txt too big")
+struct Scene {
+    polytope_path: String,
+    resolution: u32,
+    frame_count: i32,
+    facet_expansion: f32,
+    min_dimension: usize,
+    dimension: usize,
+    vertices: Vec<DVector<f32>>,
+    edges: Vec<usize>,
+}
+
+impl Scene {
+    fn setup() -> Self {
+        if !std::path::Path::new("./src/setup.txt").exists() {
+            panic!("no setup.txt file!!!!");
         }
         
-        setup_index += 1;
+        let setup_file_contents = std::fs::read_to_string("./src/setup.txt").unwrap();
+        let lines: Vec<&str> = setup_file_contents.lines().collect();
+        
+        Scene {
+            polytope_path: lines[0].to_string(),
+            resolution: lines[1].parse().unwrap(),
+            frame_count: lines[2].parse().unwrap(),
+            min_dimension: lines[3].parse().unwrap(),
+            facet_expansion: lines[4].parse().unwrap(),
+            dimension: 0,
+            vertices: vec![],
+            edges: vec![],
+        }
     }
+}
+
+#[macroquad::main("nD Renderer")]
+async fn main() {
+    let mut scene = Scene::setup();
     
-    let mut dimension = 0;
+    load_polytope(&mut scene);
     
-    let mut vertices: Vec<DVector<f32>> = Vec::new();
-    let mut edges: Vec<usize> = Vec::new();
-    
-    load_polytope(path.to_string(), &mut vertices, &mut edges, &mut dimension, min_dimension, facet_expansion);
-    
-    let mut shape_matrix = DMatrix::identity(dimension, dimension);
-    let mut shape_position = DVector::zeros(dimension);
+    let mut shape_matrix = DMatrix::identity(scene.dimension, scene.dimension);
+    let mut shape_position = DVector::zeros(scene.dimension);
     shape_position[2] = 2.0;
     
     let mut render_size= 0.5;
@@ -488,21 +492,21 @@ async fn main() {
         
         if is_mouse_button_down(MouseButton::Left) || is_mouse_button_down(MouseButton::Middle) {
             if is_key_down(KeyCode::LeftControl) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 3, -1.0/216.0);
+                shape_matrix = mouse_control(previous_mouse_pos, scene.dimension, shape_matrix, 3, -1.0/216.0);
             } else if is_key_down(KeyCode::Z) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 4, -1.0/216.0);
+                shape_matrix = mouse_control(previous_mouse_pos, scene.dimension, shape_matrix, 4, -1.0/216.0);
             } else if is_key_down(KeyCode::X) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 5, -1.0/216.0);
+                shape_matrix = mouse_control(previous_mouse_pos, scene.dimension, shape_matrix, 5, -1.0/216.0);
             } else if is_key_down(KeyCode::C) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 6, -1.0/216.0);
+                shape_matrix = mouse_control(previous_mouse_pos, scene.dimension, shape_matrix, 6, -1.0/216.0);
             } else if is_key_down(KeyCode::V) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 7, -1.0/216.0);
+                shape_matrix = mouse_control(previous_mouse_pos, scene.dimension, shape_matrix, 7, -1.0/216.0);
             } else if is_key_down(KeyCode::B) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 8, -1.0/216.0);
+                shape_matrix = mouse_control(previous_mouse_pos, scene.dimension, shape_matrix, 8, -1.0/216.0);
             } else if is_key_down(KeyCode::N) {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 9, -1.0/216.0);
+                shape_matrix = mouse_control(previous_mouse_pos, scene.dimension, shape_matrix, 9, -1.0/216.0);
             } else {
-                shape_matrix = mouse_control(previous_mouse_pos, dimension, shape_matrix, 2, 1.0/216.0);
+                shape_matrix = mouse_control(previous_mouse_pos, scene.dimension, shape_matrix, 2, 1.0/216.0);
             }
             
             (previous_mouse_pos.x, previous_mouse_pos.y) = mouse_position();
@@ -553,13 +557,20 @@ async fn main() {
         }
         if is_key_pressed(KeyCode::F) {
             subdivisions -= 1;
+            if subdivisions == 0 {
+                subdivisions = 1;
+            }
+        }
+        if is_key_pressed(KeyCode::Key0) {
+            scene = Scene::setup();
+            load_polytope(&mut scene);
         }
         
-        render(&vertices, &edges, subdivisions, &shape_matrix, &shape_position, edge_width, near, far, zoom, w_scale, render_size);
+        render(&scene.vertices, &scene.edges, subdivisions, &shape_matrix, &shape_position, edge_width, near, far, zoom, w_scale, render_size);
         
         if image_index > -1 { // During the loop
             for i in (0..rotations.len()).step_by(2) {
-                let rotation_matrix = rotate_matrix(rotations[i], rotations[i + 1], TAU / (frame_count as f32), shape_matrix.ncols());
+                let rotation_matrix = rotate_matrix(rotations[i], rotations[i + 1], TAU / (scene.frame_count as f32), shape_matrix.ncols());
                 if rotations_global_vs_local[i / 2] {
                     shape_matrix = &shape_matrix * rotation_matrix;
                 } else {
@@ -568,7 +579,7 @@ async fn main() {
             }
             for i in 0..motion.len() {
                 if i != 2 {
-                    shape_position[i] += motion[i] / (frame_count as f32);
+                    shape_position[i] += motion[i] / (scene.frame_count as f32);
                 }
             }
             
@@ -580,7 +591,7 @@ async fn main() {
             image_index = 0;
         }
         
-        if image_index == frame_count { // End
+        if image_index == scene.frame_count { // End
             set_default_camera();
             image_index = -2;
             set_window_size(1024, 1024);
@@ -651,7 +662,7 @@ async fn main() {
             
             println!("{:?}", starting_position);
             
-            // set_window_size(256, 256);
+            set_window_size(scene.resolution, scene.resolution);
         }
         
         next_frame().await
