@@ -1,3 +1,7 @@
+Hello and thank you for deciding to give my renderer a try! I hope you find it easy to use and are pleased with the images/videos you make with it. You don't have to credit me for use, but it is appreciated, you can credit me as tessimal, @tessimal256 on YouTube, or link to my website, https://fifty-third-dimension.neocities.org/.
+
+This text file documents how to use the program without actually opening main.rs. All of the text files mentioned here can be found in ./src.
+
 rotations.txt:
     every line is a plane of rotation.
     first two numbers are the axes, last number is 0 for a camera space rotation and 1 for an object space rotation.
