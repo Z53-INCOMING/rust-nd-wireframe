@@ -423,7 +423,7 @@ async fn main() {
     let mut vertices: Vec<DVector<f32>> = Vec::new();
     let mut edges: Vec<usize> = Vec::new();
     
-    load_polytope("./hexelte.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4, 0.8);
+    load_polytope("./5-cell.off".to_string(), &mut vertices, &mut edges, &mut dimension, 4, 0.0);
     
     let mut shape_matrix = DMatrix::identity(dimension, dimension);
     let mut shape_position = DVector::zeros(dimension);
@@ -442,7 +442,10 @@ async fn main() {
     let mut subdivisions = 1;
     
     let mut image_index = -2;
-    let frame_count = 240;
+    let frame_count = 60;
+    
+    let mut rotations: Vec<usize> = vec![];
+    let mut rotations_global_vs_local: Vec<bool> = vec![];
     
     let done_sound = load_sound("done.wav").await.unwrap();
     
@@ -522,7 +525,14 @@ async fn main() {
         render(&vertices, &edges, subdivisions, &shape_matrix, &shape_position, edge_width, near, far, zoom, w_scale, render_size);
         
         if image_index > -1 { // During the loop
-            shape_matrix = rotate_matrix(0, 2, TAU / (frame_count as f32), shape_matrix.ncols()) * &shape_matrix;
+            for i in (0..rotations.len()).step_by(2) {
+                let rotation_matrix = rotate_matrix(rotations[i], rotations[i + 1], TAU / (frame_count as f32), shape_matrix.ncols());
+                if rotations_global_vs_local[i / 2] {
+                    shape_matrix = &shape_matrix * rotation_matrix;
+                } else {
+                    shape_matrix = rotation_matrix * &shape_matrix;
+                }
+            }
             // shape_position[5] += 2.0 / (frame_count as f32);
             
             get_screen_data().export_png(&format!("./images/{:03}.png", image_index));
@@ -544,6 +554,37 @@ async fn main() {
         
         if is_key_pressed(KeyCode::Enter) { // Start
             image_index = -1;
+            
+            if !std::path::Path::new("./rotations.txt").exists() {
+                panic!("no rotations.txt file!!!!");
+            }
+
+            let contents = std::fs::read_to_string("./rotations.txt").unwrap();
+            
+            rotations.clear();
+            rotations_global_vs_local.clear();
+            
+            let mut values: Vec<usize> = vec![];
+            
+            for line in contents.lines() {
+                // go through the line of text to find the indices
+                let mut index = 0;
+                for number_string in line.split(" ") {
+                    let number: usize = number_string.parse().unwrap();
+                    
+                    values.push(number);
+                    
+                    index += 1;
+                }
+            }
+            
+            for i in (0..values.len()).step_by(3) {
+                rotations.push(values[i]);
+                rotations.push(values[i + 1]);
+                
+                rotations_global_vs_local.push(values[i + 2] == 1);
+            }
+            
             // set_window_size(256, 256);
             // shape_position[5] = -1.0;
         }
