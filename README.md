@@ -43,8 +43,8 @@ Uh yeah I think that's about it for how to use this program. The rest will dive 
 - motion and starting position cannot be applied to the Z (2) axis.
 
 ## setup.txt
-- first line is a path to the folder containing the polytope
-- second line is a path to the polytope you wish to load
+- first line is a path to any folder that contains only polytopes and other polytope folders
+- second line is a path to the polytope you wish to load on startup
 - third line is the horizontal and vertical resolution of the animation in a single number, so all animations must be square.
 - fourth line is the number of frames in the animation.
 - fifth line is the minimum dimension
@@ -83,7 +83,7 @@ R/F - controls the number of subdivisions of the edges<br>
 T/G - increase/decrease the element expansion (credit to MinersHavenM43)<br>
 <br>
 J - enters free rotation, where you don't have to hold down the button or worry about your mouse running out of room<br>
-K - picks a random polytope from the directory, and prints its name to the console, for guessing games<br>
+K - picks a random polytope from the directory specified on setup line one, and prints its name to the console, for guessing games<br>
 <br>
 0 - reloads setup.txt<br>
 1 - saves current camera rotation for more advanced animation<br>
