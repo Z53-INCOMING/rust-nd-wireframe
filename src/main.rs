@@ -83,6 +83,7 @@ fn main() {
     let mut motion: Vec<f32> = vec![];
 
     let done_sound = SoundBuffer::from_memory(DONE_SOUND_BYTES).expect("invalid done sound");
+    let mut sound;
 
     let mut virtual_image = RenderTexture::new(scene.resolution, scene.resolution).unwrap();
     let mut window = RenderWindow::new(
@@ -412,7 +413,7 @@ fn main() {
                 shape_position[i] = 0.0;
             }
 
-            let mut sound = Sound::new();
+            sound = Sound::new();
             sound.set_buffer(&done_sound);
             sound.play();
         }
