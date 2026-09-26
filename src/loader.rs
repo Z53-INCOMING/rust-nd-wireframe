@@ -6,7 +6,7 @@ use nalgebra::DVector;
 use sfml::graphics::Color;
 use walkdir::{DirEntry, WalkDir};
 
-use crate::Scene;
+use crate::scene::Scene;
 
 fn get_vertices_from_element(
     polytope_data: &Vec<Vec<Vec<usize>>>,
