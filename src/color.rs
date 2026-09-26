@@ -5,6 +5,7 @@ use sfml::graphics::{glsl::Vec2, Color};
 
 use crate::math::{inverse_lerp, lerp};
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn color_from_hue(hue: f32) -> Color {
     // originally (5. + hue * 6.) / 6. but i simplified it -malki
     let kr = f32::fract(5.0 / 6.0 + hue) * 6.0;
@@ -18,6 +19,7 @@ pub fn color_from_hue(hue: f32) -> Color {
     Color::rgba((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8, 255)
 }
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn color_from_wv(vector: &DVector<f32>, w_scale: f32, edge_color: Color) -> Color {
     if vector.len() < 4 {
         return edge_color;
@@ -36,18 +38,18 @@ pub fn color_from_wv(vector: &DVector<f32>, w_scale: f32, edge_color: Color) -> 
 
     Color::rgba(
         lerp(
-            edge_color.r as f32,
-            fade_to_color.r as f32,
+            f32::from(edge_color.r),
+            f32::from(fade_to_color.r),
             (fade_strength * 2.0).min(1.0),
         ) as u8,
         lerp(
-            edge_color.g as f32,
-            fade_to_color.g as f32,
+            f32::from(edge_color.g),
+            f32::from(fade_to_color.g),
             (fade_strength * 2.0).min(1.0),
         ) as u8,
         lerp(
-            edge_color.b as f32,
-            fade_to_color.b as f32,
+            f32::from(edge_color.b),
+            f32::from(fade_to_color.b),
             (fade_strength * 2.0).min(1.0),
         ) as u8,
         ((1.0 - fade_strength) * 255.0) as u8,
