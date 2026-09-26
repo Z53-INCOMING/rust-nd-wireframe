@@ -1,13 +1,13 @@
 #![allow(clippy::cast_precision_loss)]
 
-use nalgebra::{DMatrix, DVector, VecStorage, Vector2};
-use sfml::audio::{self, Sound, SoundBuffer};
+use nalgebra::{DMatrix, DVector, VecStorage};
+use sfml::audio::{Sound, SoundBuffer};
 use sfml::graphics::glsl::Vec2;
 use sfml::graphics::{RenderTarget, RenderTexture, RenderWindow};
 use sfml::system::Vector2i;
 use sfml::window::mouse::{Button, Wheel};
-use sfml::window::{self, mouse, ContextSettings, Event, Key, Style};
-use std::collections::{HashMap, HashSet};
+use sfml::window::{ContextSettings, Event, Key, Style};
+use std::collections::HashSet;
 use std::env;
 use std::f32::consts::TAU;
 
@@ -63,11 +63,11 @@ fn main() {
         zoom: 2.0,
     };
 
-    let mut previous_mouse_pos = Vector2::new(0.0, 0.0);
+    let mut previous_mouse_pos = Vector2i::new(0, 0);
     let mut mouse_lock: bool = false;
     // 0 = left, 1 = middle, 2 = right
     let mut mouse_buttons: [bool; 3] = [false, false, false];
-    let mut mouse_scroll_delta: f32 = 0.0;
+    let mut mouse_scroll_delta: f32;
 
     let mut down_keys: HashSet<Key> = HashSet::new();
 
@@ -99,6 +99,8 @@ fn main() {
 
     'mainloop: loop {
         mouse_scroll_delta = 0.0;
+        let mut enter_pressed = false;
+        let mut escape_pressed = false;
 
         while let Some(ev) = window.poll_event() {
             match ev {
@@ -133,11 +135,11 @@ fn main() {
                     match code {
                         Key::R => {
                             edge_settings.subdivisions =
-                                edge_settings.subdivisions.saturating_add(1)
+                                edge_settings.subdivisions.saturating_add(1);
                         }
                         Key::F => {
                             edge_settings.subdivisions =
-                                edge_settings.subdivisions.saturating_sub(1)
+                                edge_settings.subdivisions.saturating_sub(1);
                         }
 
                         Key::T => {
@@ -194,11 +196,15 @@ fn main() {
                         }
                         // TODO: mouse lock
                         Key::J => mouse_lock = !mouse_lock,
+                        Key::Escape => escape_pressed = true,
+                        Key::Enter => enter_pressed = true,
+                        _ => (),
                     }
                 }
                 Event::KeyReleased { code, .. } => {
                     down_keys.remove(&code);
                 }
+                _ => (),
             }
         }
 
@@ -280,8 +286,8 @@ fn main() {
 
         if mouse_buttons[2] {
             let mouse_delta = Vec2::new(
-                mouse_position(&window).x as f32 - (window.size().x as f32 / 2.0),
-                mouse_position(&window).y as f32 - (window.size().y as f32 / 2.0),
+                window.mouse_position().x as f32 - (window.size().x as f32 / 2.0),
+                window.mouse_position().y as f32 - (window.size().y as f32 / 2.0),
             ) - (Vec2::new(
                 previous_mouse_pos.x as f32 - (window.size().x as f32 / 2.0),
                 previous_mouse_pos.y as f32 - (window.size().y as f32 / 2.0),
@@ -291,8 +297,8 @@ fn main() {
             shape_matrix = rotate_matrix(0, 1, angle_diff, scene.dimension) * &shape_matrix;
         }
 
-        previous_mouse_pos.x = mouse_position(&window).x as f32;
-        previous_mouse_pos.x = mouse_position(&window).y as f32;
+        previous_mouse_pos.x = window.mouse_position().x;
+        previous_mouse_pos.y = window.mouse_position().y;
 
         if mouse_scroll_delta < 0.0 {
             if down_keys.contains(&Key::LControl) {
@@ -366,6 +372,7 @@ fn main() {
         }
 
         // render the scene to the screen
+        let screen_size = window.size().as_other();
         render(
             &mut window,
             &scene,
@@ -374,7 +381,7 @@ fn main() {
             edge_settings,
             fade_planes,
             camera,
-            window.size().as_other(),
+            screen_size,
         );
 
         if image_index > -1 {
@@ -423,7 +430,7 @@ fn main() {
             sound.play();
         }
 
-        if is_key_pressed(KeyCode::Escape) {
+        if escape_pressed {
             for i in 0..scene.dimension {
                 shape_position[i] = 0.0;
             }
@@ -443,7 +450,7 @@ fn main() {
             image_index = -2;
         }
 
-        if is_key_pressed(KeyCode::Enter) {
+        if enter_pressed {
             image_index = -1;
 
             start_animation(
@@ -451,6 +458,7 @@ fn main() {
                 &mut rotations_global_vs_local,
                 &mut rotation_amounts,
                 &mut starting_position,
+                &mut shape_position,
                 &mut motion,
             );
         }
@@ -464,6 +472,7 @@ fn start_animation(
     rotations_global_vs_local: &mut Vec<bool>,
     rotation_amounts: &mut Vec<f32>,
     starting_position: &mut Vec<f32>,
+    shape_position: &mut DVector<f32>,
     motion: &mut Vec<f32>,
 ) {
     // Start
@@ -532,7 +541,7 @@ fn start_animation(
 
 fn mouse_control(
     window: &RenderWindow,
-    previous_mouse_pos: Vector2<f32>,
+    previous_mouse_pos: Vector2i,
     dimension: usize,
     shape_matrix: DMatrix<f32>,
     axis: usize,
@@ -542,19 +551,15 @@ fn mouse_control(
         rotate_matrix(
             1,
             axis,
-            (mouse_position(&window).x as f32 - previous_mouse_pos.y) * -sensitivity,
+            (window.mouse_position().y - previous_mouse_pos.y) as f32 * -sensitivity,
             dimension,
         ) * rotate_matrix(
             0,
             axis,
-            (mouse_position(&window).y as f32 - previous_mouse_pos.x) * sensitivity,
+            (window.mouse_position().x - previous_mouse_pos.x) as f32 * sensitivity,
             dimension,
         ) * shape_matrix
     } else {
         shape_matrix
     }
-}
-
-fn mouse_position(window: &RenderWindow) -> Vector2i {
-    mouse::desktop_position() - window.position()
 }
