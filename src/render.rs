@@ -95,7 +95,6 @@ pub fn render(
     edge_settings: EdgeSettings,
     fade_planes: FadePlanes,
     camera: CameraPerspective,
-    screen_size: Vec2,
 ) {
     let EdgeSettings {
         edge_width,
@@ -103,6 +102,7 @@ pub fn render(
     } = edge_settings;
     let FadePlanes { w_scale, .. } = fade_planes;
     let CameraPerspective { render_size, .. } = camera;
+    let screen_size: Vec2 = target.size().as_other();
 
     target.clear(Color::BLACK);
 
@@ -147,6 +147,7 @@ pub fn render(
     }
 }
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 #[inline]
 fn get_alpha(
     color: Color,
@@ -154,9 +155,9 @@ fn get_alpha(
     fade_planes: FadePlanes,
     camera: CameraPerspective,
 ) -> u8 {
-    let mut a = color.a as f32 / 255.0;
+    let mut a = f32::from(color.a) / 255.0;
     a *= fade_from_depth(vertex[2], fade_planes.near, fade_planes.far, camera.zoom);
-    a *= 1.0 - (distance_from_nvolume(&vertex, 5) * fade_planes.w_scale).clamp(0.0, 1.0);
+    a *= 1.0 - (distance_from_nvolume(vertex, 5) * fade_planes.w_scale).clamp(0.0, 1.0);
 
     (a.clamp(0.0, 1.0) * 255.0) as u8
 }

@@ -3,7 +3,7 @@ use sfml::graphics::glsl::Vec2;
 
 #[inline]
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
-    a + t * (b - a)
+    t.mul_add(b - a, a)
 }
 
 #[inline]

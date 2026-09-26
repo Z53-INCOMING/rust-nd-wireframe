@@ -343,20 +343,8 @@ fn main() {
         if image_index > -1 {
             // set camera to render target
             // TODO: set this back up
-            /* set_camera(&Camera2D {
-                render_target: Some(virtual_image.clone()),
-                zoom: vec2(
-                    1.0 / (scene.resolution as f32) * 2.0,
-                    1.0 / (scene.resolution as f32) * -2.0,
-                ),
-                target: vec2(
-                    (scene.resolution as f32) / 2.0,
-                    (scene.resolution as f32) / 2.0,
-                ),
-                ..Default::default()
-            }); */
 
-            // render the scene
+            // render the scene to virtual_image
             render(
                 &mut virtual_image,
                 &scene,
@@ -365,14 +353,10 @@ fn main() {
                 edge_settings,
                 fade_planes,
                 camera,
-                Vec2::new(scene.resolution_vector.x, scene.resolution_vector.y),
             );
-
-            // go back to the screen
         }
 
         // render the scene to the screen
-        let screen_size = window.size().as_other();
         render(
             &mut window,
             &scene,
@@ -381,7 +365,6 @@ fn main() {
             edge_settings,
             fade_planes,
             camera,
-            screen_size,
         );
 
         if image_index > -1 {
