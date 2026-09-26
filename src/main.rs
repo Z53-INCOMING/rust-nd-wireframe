@@ -194,8 +194,11 @@ fn main() {
                             rotational_offset = shape_matrix.clone() * rotational_offset;
                             shape_matrix = DMatrix::identity(scene.dimension, scene.dimension);
                         }
-                        // TODO: mouse lock
-                        Key::J => mouse_lock = !mouse_lock,
+                        Key::J => {
+                            mouse_lock = !mouse_lock;
+                            window.set_mouse_cursor_visible(!mouse_lock);
+                            window.set_mouse_cursor_grabbed(mouse_lock);
+                        }
                         Key::Escape => escape_pressed = true,
                         Key::Enter => enter_pressed = true,
                         _ => (),
@@ -342,7 +345,6 @@ fn main() {
 
         if image_index > -1 {
             // set camera to render target
-            // TODO: set this back up
 
             // render the scene to virtual_image
             render(
@@ -388,12 +390,14 @@ fn main() {
                 }
             }
 
-            /* let mut img = virtual_image.texture.get_texture_data();
-            for pix in img.get_image_data_mut() {
-                // Force saved image to have no transparency
-                pix[3] = 255;
-            }
-            img.export_png(&format!("./images/{image_index:03}.png")); */
+            virtual_image.display();
+
+            virtual_image
+                .texture()
+                .copy_to_image()
+                .expect("could not copy texture to image")
+                .save_to_file(&format!("./images/{image_index:03}.png"))
+                .expect("could not save image");
 
             image_index += 1;
         }
