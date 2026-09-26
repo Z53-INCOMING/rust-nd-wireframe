@@ -20,6 +20,8 @@ pub struct Scene {
 }
 
 impl Scene {
+    /// # Panics
+    /// Panics when setup.toml or setup.txt is invalid
     pub fn setup(mut args: impl Iterator<Item = String>) -> Self {
         let given_polytope_path: Option<PathBuf> = args.nth(1).map(Into::into);
 
@@ -67,6 +69,8 @@ impl Scene {
         self.edges.clear();
     }
 
+    #[must_use]
+    #[allow(dead_code, clippy::cast_precision_loss)]
     pub const fn resolution_vector(&self) -> Vector2<f32> {
         Vector2::new(self.resolution as f32, self.resolution as f32)
     }

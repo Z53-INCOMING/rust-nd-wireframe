@@ -6,6 +6,7 @@ use sfml::graphics::{glsl::Vec2, Color};
 use crate::math::{inverse_lerp, lerp};
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[must_use]
 pub fn color_from_hue(hue: f32) -> Color {
     // originally (5. + hue * 6.) / 6. but i simplified it -malki
     let kr = f32::fract(5.0 / 6.0 + hue) * 6.0;
@@ -20,6 +21,7 @@ pub fn color_from_hue(hue: f32) -> Color {
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[must_use]
 pub fn color_from_wv(vector: &DVector<f32>, w_scale: f32, edge_color: Color) -> Color {
     if vector.len() < 4 {
         return edge_color;
