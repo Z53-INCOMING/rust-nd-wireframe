@@ -17,7 +17,6 @@ pub struct Scene {
     pub vertices: Vec<DVector<f32>>,
     pub edges: Vec<usize>,
     pub edge_colors: Vec<Color>,
-    pub resolution_vector: Vector2<f32>,
 }
 
 impl Scene {
@@ -60,13 +59,16 @@ impl Scene {
             vertices: vec![],
             edges: vec![],
             edge_colors: vec![],
-            resolution_vector: Vector2::new(lines[2].parse().unwrap(), lines[2].parse().unwrap()),
         }
     }
 
     pub fn clear_polytope(&mut self) {
         self.vertices.clear();
         self.edges.clear();
+    }
+
+    pub const fn resolution_vector(&self) -> Vector2<f32> {
+        Vector2::new(self.resolution as f32, self.resolution as f32)
     }
 }
 
@@ -98,10 +100,6 @@ impl From<SceneConfig> for Scene {
             vertices: vec![],
             edges: vec![],
             edge_colors: vec![],
-            resolution_vector: Vector2::new(
-                value.animation.resolution as f32,
-                value.animation.resolution as f32,
-            ),
         }
     }
 }
