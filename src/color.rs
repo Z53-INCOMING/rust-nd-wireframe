@@ -58,6 +58,7 @@ pub fn color_from_wv(vector: &DVector<f32>, w_scale: f32, edge_color: Color) -> 
     )
 }
 
+#[must_use]
 pub fn fade_from_depth(z: f32, near: f32, far: f32, zoom: f32) -> f32 {
     1.0 - inverse_lerp(near + zoom, far + zoom, z).clamp(0.0, 1.0)
 }
