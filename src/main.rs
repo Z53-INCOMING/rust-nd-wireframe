@@ -4,7 +4,7 @@ use nalgebra::{DMatrix, DVector, VecStorage};
 use sfml::audio::{Sound, SoundBuffer};
 use sfml::graphics::glsl::Vec2;
 use sfml::graphics::{RenderTarget, RenderTexture, RenderWindow};
-use sfml::system::Vector2i;
+use sfml::system::{Vector2, Vector2i};
 use sfml::window::mouse::{Button, Wheel};
 use sfml::window::{ContextSettings, Event, Key, Style};
 use std::collections::HashSet;
@@ -289,14 +289,8 @@ fn main() {
         }
 
         if mouse_buttons[2] {
-            let mouse_delta = Vec2::new(
-                window.mouse_position().x as f32 - (window.size().x as f32 / 2.0),
-                window.mouse_position().y as f32 - (window.size().y as f32 / 2.0),
-            ) - (Vec2::new(
-                previous_mouse_pos.x as f32 - (window.size().x as f32 / 2.0),
-                previous_mouse_pos.y as f32 - (window.size().y as f32 / 2.0),
-            ));
-            let angle_diff = mouse_delta.y.atan2(mouse_delta.x);
+            let mouse_delta: Vec2 = (window.mouse_position() - previous_mouse_pos).as_other();
+            let angle_diff: f32 = mouse_delta.x * -0.01;
 
             shape_matrix = rotate_matrix(0, 1, angle_diff, scene.dimension) * &shape_matrix;
         }
