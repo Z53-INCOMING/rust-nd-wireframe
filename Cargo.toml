@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-macroquad = { version = "0.4.16", features = ["audio"] }
+fastrand = "2.5.0"
 nalgebra = "0.35.0"
 serde = { version = "1.0.229", features = ["derive"] }
+sfml = "0.25.1"
 toml = "1.1.6"
 walkdir = "2.5.0"

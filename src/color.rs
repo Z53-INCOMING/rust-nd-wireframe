@@ -1,8 +1,12 @@
 use std::f32::consts::TAU;
 
-use macroquad::prelude::*;
 use nalgebra::DVector;
+use sfml::graphics::{glsl::Vec2, Color};
 
+use crate::math::{inverse_lerp, lerp};
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[must_use]
 pub fn color_from_hue(hue: f32) -> Color {
     // originally (5. + hue * 6.) / 6. but i simplified it -malki
     let kr = f32::fract(5.0 / 6.0 + hue) * 6.0;
@@ -13,9 +17,11 @@ pub fn color_from_hue(hue: f32) -> Color {
     let g = 1.0 - f32::min(kg, 4.0 - kg).clamp(0.0, 1.0);
     let b = 1.0 - f32::min(kb, 4.0 - kb).clamp(0.0, 1.0);
 
-    Color::new(r, g, b, 1.0)
+    Color::rgba((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8, 255)
 }
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[must_use]
 pub fn color_from_wv(vector: &DVector<f32>, w_scale: f32, edge_color: Color) -> Color {
     if vector.len() < 4 {
         return edge_color;
@@ -29,29 +35,30 @@ pub fn color_from_wv(vector: &DVector<f32>, w_scale: f32, edge_color: Color) -> 
         }
     });
 
-    let fade_to_color = color_from_hue((wv_vector.to_angle() / TAU) + 0.5 + (1.0 / 12.0));
-    let fade_strength = f32::min(wv_vector.length() * w_scale, 1.0);
+    let fade_to_color = color_from_hue((wv_vector.y.atan2(wv_vector.x) / TAU) + 0.5 + (1.0 / 12.0));
+    let fade_strength = f32::min(wv_vector.length_sq().sqrt() * w_scale, 1.0);
 
-    Color::new(
-        f32::lerp(
-            edge_color.r,
-            fade_to_color.r,
+    Color::rgba(
+        lerp(
+            f32::from(edge_color.r),
+            f32::from(fade_to_color.r),
             (fade_strength * 2.0).min(1.0),
-        ),
-        f32::lerp(
-            edge_color.g,
-            fade_to_color.g,
+        ) as u8,
+        lerp(
+            f32::from(edge_color.g),
+            f32::from(fade_to_color.g),
             (fade_strength * 2.0).min(1.0),
-        ),
-        f32::lerp(
-            edge_color.b,
-            fade_to_color.b,
+        ) as u8,
+        lerp(
+            f32::from(edge_color.b),
+            f32::from(fade_to_color.b),
             (fade_strength * 2.0).min(1.0),
-        ),
-        1.0 - fade_strength,
+        ) as u8,
+        ((1.0 - fade_strength) * 255.0) as u8,
     )
 }
 
+#[must_use]
 pub fn fade_from_depth(z: f32, near: f32, far: f32, zoom: f32) -> f32 {
-    1.0 - clamp(f32::inverse_lerp(near + zoom, far + zoom, z), 0.0, 1.0)
+    1.0 - inverse_lerp(near + zoom, far + zoom, z).clamp(0.0, 1.0)
 }

@@ -1,15 +1,12 @@
-#![allow(clippy::cast_precision_loss, clippy::too_many_lines)]
+#![allow(clippy::cast_precision_loss)]
 
 use std::{ffi::OsStr, path::PathBuf};
 
-use macroquad::{
-    color::{Color, MAGENTA, WHITE},
-    rand::ChooseRandom,
-};
 use nalgebra::DVector;
+use sfml::graphics::Color;
 use walkdir::{DirEntry, WalkDir};
 
-use crate::Scene;
+use crate::scene::Scene;
 
 fn get_vertices_from_element(
     polytope_data: &Vec<Vec<Vec<usize>>>,
@@ -75,6 +72,8 @@ fn get_vertices_from_element(
     }
 }
 
+/// # Panics
+/// Panics if `scene.polytope_path` cannot be read
 pub fn load_polytope(scene: &mut Scene, random: bool) {
     if random {
         set_random_polytope(scene);
@@ -107,11 +106,8 @@ fn set_random_polytope(scene: &mut Scene) {
         .filter(|path| path.as_path() != scene.polytope_path.as_path()) // Convert WalkDir Entry to PathBuf
         .collect();
 
-    let file = files
-        .choose()
-        .expect("File cannot be found or doesnt exist!!!!");
-
-    scene.polytope_path.clone_from(file); // equivalent to scene.polytope.path = file.clone() but supposedly faster
+    scene.polytope_path =
+        fastrand::choice(files).expect("File cannot be found or doesnt exist!!!!");
 
     let polytope_name = scene
         .polytope_path
@@ -268,7 +264,7 @@ fn load_polytope_data(scene: &mut Scene, contents: &str) -> LoadPolytopeDataOutp
                     if !found_duplicate {
                         scene.edges.push(vertex_index_a);
                         scene.edges.push(vertex_index_b);
-                        scene.edge_colors.push(WHITE);
+                        scene.edge_colors.push(Color::WHITE);
                     }
                 }
             }
@@ -358,21 +354,11 @@ fn expand_facets(
                 match facet_vertices.len() {
                     3 => {
                         // A2, red
-                        scene.edge_colors.push(Color {
-                            r: 213.0 / 255.0,
-                            g: 56.0 / 255.0,
-                            b: 56.0 / 255.0,
-                            a: 1.0,
-                        });
+                        scene.edge_colors.push(Color::rgb(213, 56, 56));
                     }
                     6 => {
                         // G2/2, light red
-                        scene.edge_colors.push(Color {
-                            r: 208.0 / 255.0,
-                            g: 100.0 / 255.0,
-                            b: 100.0 / 255.0,
-                            a: 1.0,
-                        });
+                        scene.edge_colors.push(Color::rgb(208, 100, 100));
                     }
                     4 => {
                         // lies roughly on the axes
@@ -385,62 +371,37 @@ fn expand_facets(
                             // exclude H3
                             if polytope_data[0].len() < 30 {
                                 // B2, blue
-                                scene.edge_colors.push(Color {
-                                    r: 43.0 / 255.0,
-                                    g: 38.0 / 255.0,
-                                    b: 135.0 / 255.0,
-                                    a: 1.0,
-                                });
+                                scene.edge_colors.push(Color::rgb(43, 38, 135));
                                 continue;
                             }
                         }
 
                         // K2, yellow
-                        scene.edge_colors.push(Color {
-                            r: 229.0 / 255.0,
-                            g: 188.0 / 255.0,
-                            b: 38.0 / 255.0,
-                            a: 1.0,
-                        });
+                        scene.edge_colors.push(Color::rgb(229, 188, 38));
                     }
                     8 => {
                         // I2(8)/2, light blue
-                        scene.edge_colors.push(Color {
-                            r: 87.0 / 255.0,
-                            g: 83.0 / 255.0,
-                            b: 153.0 / 255.0,
-                            a: 1.0,
-                        });
+                        scene.edge_colors.push(Color::rgb(87, 83, 153));
                     }
                     5 => {
                         // H2, purple
-                        scene.edge_colors.push(Color {
-                            r: 139.0 / 255.0,
-                            g: 58.0 / 255.0,
-                            b: 177.0 / 255.0,
-                            a: 1.0,
-                        });
+                        scene.edge_colors.push(Color::rgb(139, 58, 177));
                         // green
                         // scene.edge_colors.push(Color { r: 66.0/255.0, g: 210.0/255.0, b: 58.0/255.0, a: 1.0 });
                     }
                     10 => {
                         // I2(10)/2, light purple
-                        scene.edge_colors.push(Color {
-                            r: 147.0 / 255.0,
-                            g: 98.0 / 255.0,
-                            b: 170.0 / 255.0,
-                            a: 1.0,
-                        });
+                        scene.edge_colors.push(Color::rgb(147, 98, 170));
                         // light green
                         // scene.edge_colors.push(Color { r: 86.0/255.0, g: 220.0/255.0, b: 129.0/255.0, a: 1.0 });
                     }
                     _ => {
                         // ???
-                        scene.edge_colors.push(MAGENTA);
+                        scene.edge_colors.push(Color::MAGENTA);
                     }
                 }
             } else {
-                scene.edge_colors.push(WHITE);
+                scene.edge_colors.push(Color::WHITE);
             }
         }
     }

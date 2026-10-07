@@ -1,11 +1,14 @@
-use macroquad::prelude::*;
 use nalgebra::{DMatrix, DVector};
+use sfml::cpp::FBox;
+use sfml::graphics::glsl::Vec2;
+use sfml::graphics::{Color, PrimitiveType, RenderStates, RenderTarget, Vertex};
 
 use crate::color::{color_from_wv, fade_from_depth};
-use crate::math::{distance_from_nvolume, project_vertex};
+use crate::math::{distance_from_nvolume, normalize, project_vertex};
 use crate::scene::Scene;
 
 pub fn draw_triangle_color(
+    target: &mut FBox<impl RenderTarget>,
     v1: Vec2,
     v2: Vec2,
     v3: Vec2,
@@ -13,22 +16,17 @@ pub fn draw_triangle_color(
     color2: Color,
     color3: Color,
 ) {
-    let context = unsafe { get_internal_gl() };
-
     let vertices = [
-        Vertex::new(v1.x, v1.y, 0.0, 0.0, 0.0, color1),
-        Vertex::new(v2.x, v2.y, 0.0, 0.0, 0.0, color2),
-        Vertex::new(v3.x, v3.y, 0.0, 0.0, 0.0, color3),
+        Vertex::with_pos_color(Vec2::new(v1.x, v1.y), color1),
+        Vertex::with_pos_color(Vec2::new(v2.x, v2.y), color2),
+        Vertex::with_pos_color(Vec2::new(v3.x, v3.y), color3),
     ];
 
-    let indices: [u16; 3] = [0, 1, 2];
-
-    context.quad_gl.texture(None);
-    context.quad_gl.draw_mode(DrawMode::Triangles);
-    context.quad_gl.geometry(&vertices, &indices);
+    target.draw_primitives(&vertices, PrimitiveType::TRIANGLES, &RenderStates::DEFAULT);
 }
 
 pub fn draw_variable_width_line(
+    target: &mut FBox<impl RenderTarget>,
     start_point: Vec2,
     end_point: Vec2,
     start_radius: f32,
@@ -36,12 +34,13 @@ pub fn draw_variable_width_line(
     start_color: Color,
     end_color: Color,
 ) {
-    if start_color.a > 0.0 || end_color.a > 0.0 {
-        let edge_direction = (end_point - start_point).normalize();
-        let left_of_edge = vec2(edge_direction.y, -edge_direction.x);
-        let right_of_edge = vec2(-edge_direction.y, edge_direction.x);
+    if start_color.a > 0 || end_color.a > 0 {
+        let edge_direction = normalize(end_point - start_point);
+        let left_of_edge = Vec2::new(edge_direction.y, -edge_direction.x);
+        let right_of_edge = Vec2::new(-edge_direction.y, edge_direction.x);
 
         draw_triangle_color(
+            target,
             start_point + (left_of_edge * start_radius),
             start_point + (right_of_edge * start_radius),
             end_point + (left_of_edge * end_radius),
@@ -51,6 +50,7 @@ pub fn draw_variable_width_line(
         );
 
         draw_triangle_color(
+            target,
             end_point + (left_of_edge * end_radius),
             end_point + (right_of_edge * end_radius),
             start_point + (right_of_edge * start_radius),
@@ -88,22 +88,23 @@ pub struct CameraPerspective {
 
 #[allow(clippy::cast_precision_loss)]
 pub fn render(
+    target: &mut FBox<impl RenderTarget>,
     scene: &Scene,
     shape_matrix: &DMatrix<f32>,
     shape_position: &DVector<f32>,
     edge_settings: EdgeSettings,
     fade_planes: FadePlanes,
     camera: CameraPerspective,
-    screen_size: Vec2,
 ) {
     let EdgeSettings {
         edge_width,
         subdivisions,
     } = edge_settings;
-    let FadePlanes { near, far, w_scale } = fade_planes;
-    let CameraPerspective { zoom, render_size } = camera;
+    let FadePlanes { w_scale, .. } = fade_planes;
+    let CameraPerspective { render_size, .. } = camera;
+    let screen_size: Vec2 = target.size().as_other();
 
-    clear_background(BLACK);
+    target.clear(Color::BLACK);
 
     let mut local_space_vertices: Vec<DVector<f32>> = Vec::new();
 
@@ -128,14 +129,13 @@ pub fn render(
             let radius_2 = (screen_size.y * edge_width) / vertex_2[2];
 
             let mut color_1 = color_from_wv(&vertex_1, w_scale, scene.edge_colors[i / 2]);
-            color_1.a *= fade_from_depth(vertex_1[2], near, far, zoom);
-            color_1.a *= 1.0 - (distance_from_nvolume(&vertex_1, 5) * w_scale).clamp(0.0, 1.0);
+            color_1.a = get_alpha(color_1, &vertex_1, fade_planes, camera);
 
             let mut color_2 = color_from_wv(&vertex_2, w_scale, scene.edge_colors[i / 2]);
-            color_2.a *= fade_from_depth(vertex_2[2], near, far, zoom);
-            color_2.a *= 1.0 - (distance_from_nvolume(&vertex_2, 5) * w_scale).clamp(0.0, 1.0);
+            color_2.a = get_alpha(color_2, &vertex_2, fade_planes, camera);
 
             draw_variable_width_line(
+                target,
                 project_vertex(&vertex_1, render_size, screen_size),
                 project_vertex(&vertex_2, render_size, screen_size),
                 radius_1 * render_size,
@@ -145,4 +145,19 @@ pub fn render(
             );
         }
     }
+}
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[inline]
+fn get_alpha(
+    color: Color,
+    vertex: &DVector<f32>,
+    fade_planes: FadePlanes,
+    camera: CameraPerspective,
+) -> u8 {
+    let mut a = f32::from(color.a) / 255.0;
+    a *= fade_from_depth(vertex[2], fade_planes.near, fade_planes.far, camera.zoom);
+    a *= 1.0 - (distance_from_nvolume(vertex, 5) * fade_planes.w_scale).clamp(0.0, 1.0);
+
+    (a.clamp(0.0, 1.0) * 255.0) as u8
 }
